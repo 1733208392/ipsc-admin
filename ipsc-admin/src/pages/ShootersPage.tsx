@@ -22,7 +22,11 @@ const schema = z.object({
   bib_number: z.string().min(1, '必填'),
   name: z.string().min(1, '必填'),
   division_id: z.coerce.number().int().positive('请选择组别'),
-  squad_id: z.coerce.number().int().positive('请选择 Squad'),
+  squad_id: z.coerce.number().int().positive().optional(),
+  age: z.coerce.number().int().min(0).max(120).optional(),
+  gender: z.enum(['male', 'female']).optional(),
+  region: z.string().max(50).optional(),
+  club: z.string().max(100).optional(),
 })
 type FormData = z.infer<typeof schema>
 
@@ -69,13 +73,22 @@ export function ShootersPage() {
 
   function openCreate() {
     setEditing(null)
-    reset({ bib_number: '', name: '', division_id: 0, squad_id: 0 })
+    reset({ bib_number: '', name: '', division_id: 0, squad_id: undefined, age: undefined, gender: undefined, region: '', club: '' })
     setOpen(true)
   }
 
   function openEdit(s: Shooter) {
     setEditing(s)
-    reset({ bib_number: s.bib_number, name: s.name, division_id: s.division_id, squad_id: s.squad_id })
+    reset({ 
+      bib_number: s.bib_number, 
+      name: s.name, 
+      division_id: s.division_id, 
+      squad_id: s.squad_id ?? undefined,
+      age: s.age ?? undefined,
+      gender: s.gender ?? undefined,
+      region: s.region ?? '',
+      club: s.club ?? '',
+    })
     setOpen(true)
   }
 
@@ -102,16 +115,6 @@ export function ShootersPage() {
       void load()
     } catch (e) {
       toast({ title: '删除失败', description: String(e), variant: 'destructive' })
-    }
-  }
-
-  async function handleChangeSquad(shooterId: number, squadId: string) {
-    try {
-      await api.put(`/shooters/${shooterId}/squad`, { squad_id: Number(squadId) })
-      toast({ title: '更换成功' })
-      void load()
-    } catch (e) {
-      toast({ title: '更换失败', description: String(e), variant: 'destructive' })
     }
   }
 
@@ -151,7 +154,10 @@ export function ShootersPage() {
               <TableHead>Bib</TableHead>
               <TableHead>姓名</TableHead>
               <TableHead>组别</TableHead>
-              <TableHead>所属 Squad</TableHead>
+              <TableHead>年龄</TableHead>
+              <TableHead>性别</TableHead>
+              <TableHead>区域</TableHead>
+              <TableHead>俱乐部</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
@@ -161,21 +167,10 @@ export function ShootersPage() {
                 <TableCell className="font-mono font-medium">{s.bib_number}</TableCell>
                 <TableCell>{s.name}</TableCell>
                 <TableCell>{s.division_name}</TableCell>
-                <TableCell>
-                  <Select
-                    value={String(s.squad_id)}
-                    onValueChange={v => void handleChangeSquad(s.id, v)}
-                  >
-                    <SelectTrigger className="w-36 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {squads.map(sq => (
-                        <SelectItem key={sq.id} value={String(sq.id)}>{sq.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
+                <TableCell>{s.age ?? '-'}</TableCell>
+                <TableCell>{s.gender === 'male' ? '男' : s.gender === 'female' ? '女' : '-'}</TableCell>
+                <TableCell>{s.region ?? '-'}</TableCell>
+                <TableCell>{s.club ?? '-'}</TableCell>
                 <TableCell className="text-right space-x-2">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
                     <Pencil className="h-4 w-4" />
@@ -205,7 +200,7 @@ export function ShootersPage() {
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? '编辑射手' : '添加射手'}</DialogTitle>
           </DialogHeader>
@@ -222,39 +217,73 @@ export function ShootersPage() {
                 {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
               </div>
             </div>
-            <div className="space-y-1">
-              <Label>组别</Label>
-              <Select
-                value={watch('division_id') ? String(watch('division_id')) : ''}
-                onValueChange={v => setValue('division_id', Number(v))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="选择组别" />
-                </SelectTrigger>
-                <SelectContent>
-                  {divisions.map(d => (
-                    <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.division_id && <p className="text-xs text-destructive">{errors.division_id.message}</p>}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>组别</Label>
+                <Select
+                  value={watch('division_id') ? String(watch('division_id')) : ''}
+                  onValueChange={v => setValue('division_id', Number(v))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择组别" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {divisions.map(d => (
+                      <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.division_id && <p className="text-xs text-destructive">{errors.division_id.message}</p>}
+              </div>
+              <div className="space-y-1">
+                <Label>Squad（可选）</Label>
+                <Select
+                  value={watch('squad_id') ? String(watch('squad_id')) : 'none'}
+                  onValueChange={v => setValue('squad_id', v === 'none' ? undefined : Number(v))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择 Squad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">未编组</SelectItem>
+                    {squads.map(s => (
+                      <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label>Squad</Label>
-              <Select
-                value={watch('squad_id') ? String(watch('squad_id')) : ''}
-                onValueChange={v => setValue('squad_id', Number(v))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="选择 Squad" />
-                </SelectTrigger>
-                <SelectContent>
-                  {squads.map(s => (
-                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.squad_id && <p className="text-xs text-destructive">{errors.squad_id.message}</p>}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>年龄（可选）</Label>
+                <Input type="number" min="0" max="120" placeholder="年龄" {...register('age')} />
+              </div>
+              <div className="space-y-1">
+                <Label>性别（可选）</Label>
+                <Select
+                  value={watch('gender') ?? ''}
+                  onValueChange={v => setValue('gender', v === '' ? undefined : v as 'male' | 'female')}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择性别" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">不选</SelectItem>
+                    <SelectItem value="male">男</SelectItem>
+                    <SelectItem value="female">女</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>区域（可选）</Label>
+                <Input placeholder="e.g. 上海" {...register('region')} />
+              </div>
+              <div className="space-y-1">
+                <Label>俱乐部（可选）</Label>
+                <Input placeholder="e.g. 铳义堂" {...register('club')} />
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>取消</Button>

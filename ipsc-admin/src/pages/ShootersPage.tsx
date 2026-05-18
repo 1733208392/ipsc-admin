@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -203,6 +203,7 @@ export function ShootersPage() {
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? '编辑射手' : '添加射手'}</DialogTitle>
+            <DialogDescription></DialogDescription>
           </DialogHeader>
           {divisions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">正在加载组别数据...</div>
@@ -264,14 +265,14 @@ export function ShootersPage() {
                 <div className="space-y-1">
                   <Label>性别（可选）</Label>
                   <Select
-                    value={watch('gender') ?? ''}
-                    onValueChange={v => setValue('gender', v === '' ? undefined : v as 'male' | 'female')}
+                    value={watch('gender') ?? 'null'}
+                    onValueChange={v => setValue('gender', v === 'null' ? undefined : v as 'male' | 'female')}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="选择性别" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">不选</SelectItem>
+                      <SelectItem value="null">不选</SelectItem>
                       <SelectItem value="male">男</SelectItem>
                       <SelectItem value="female">女</SelectItem>
                     </SelectContent>

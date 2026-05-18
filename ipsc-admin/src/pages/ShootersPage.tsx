@@ -204,92 +204,96 @@ export function ShootersPage() {
           <DialogHeader>
             <DialogTitle>{editing ? '编辑射手' : '添加射手'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>Bib 号</Label>
-                <Input placeholder="e.g. 42" {...register('bib_number')} />
-                {errors.bib_number && <p className="text-xs text-destructive">{errors.bib_number.message}</p>}
+          {divisions.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">正在加载组别数据...</div>
+          ) : (
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Bib 号</Label>
+                  <Input placeholder="e.g. 42" {...register('bib_number')} />
+                  {errors.bib_number && <p className="text-xs text-destructive">{errors.bib_number.message}</p>}
+                </div>
+                <div className="space-y-1">
+                  <Label>姓名</Label>
+                  <Input placeholder="姓名" {...register('name')} />
+                  {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label>姓名</Label>
-                <Input placeholder="姓名" {...register('name')} />
-                {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>组别</Label>
+                  <Select
+                    value={watch('division_id') ? String(watch('division_id')) : ''}
+                    onValueChange={v => setValue('division_id', Number(v))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择组别" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {divisions.map(d => (
+                        <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.division_id && <p className="text-xs text-destructive">{errors.division_id.message}</p>}
+                </div>
+                <div className="space-y-1">
+                  <Label>Squad（可选）</Label>
+                  <Select
+                    value={watch('squad_id') ? String(watch('squad_id')) : 'none'}
+                    onValueChange={v => setValue('squad_id', v === 'none' ? undefined : Number(v))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择 Squad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">未编组</SelectItem>
+                      {squads.map(s => (
+                        <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>组别</Label>
-                <Select
-                  value={watch('division_id') ? String(watch('division_id')) : ''}
-                  onValueChange={v => setValue('division_id', Number(v))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择组别" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {divisions.map(d => (
-                      <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.division_id && <p className="text-xs text-destructive">{errors.division_id.message}</p>}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>年龄（可选）</Label>
+                  <Input type="number" min="0" max="120" placeholder="年龄" {...register('age')} />
+                </div>
+                <div className="space-y-1">
+                  <Label>性别（可选）</Label>
+                  <Select
+                    value={watch('gender') ?? ''}
+                    onValueChange={v => setValue('gender', v === '' ? undefined : v as 'male' | 'female')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择性别" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">不选</SelectItem>
+                      <SelectItem value="male">男</SelectItem>
+                      <SelectItem value="female">女</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label>Squad（可选）</Label>
-                <Select
-                  value={watch('squad_id') ? String(watch('squad_id')) : 'none'}
-                  onValueChange={v => setValue('squad_id', v === 'none' ? undefined : Number(v))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择 Squad" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">未编组</SelectItem>
-                    {squads.map(s => (
-                      <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>区域（可选）</Label>
+                  <Input placeholder="e.g. 上海" {...register('region')} />
+                </div>
+                <div className="space-y-1">
+                  <Label>俱乐部（可选）</Label>
+                  <Input placeholder="e.g. 铳义堂" {...register('club')} />
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>年龄（可选）</Label>
-                <Input type="number" min="0" max="120" placeholder="年龄" {...register('age')} />
-              </div>
-              <div className="space-y-1">
-                <Label>性别（可选）</Label>
-                <Select
-                  value={watch('gender') ?? ''}
-                  onValueChange={v => setValue('gender', v === '' ? undefined : v as 'male' | 'female')}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择性别" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">不选</SelectItem>
-                    <SelectItem value="male">男</SelectItem>
-                    <SelectItem value="female">女</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>区域（可选）</Label>
-                <Input placeholder="e.g. 上海" {...register('region')} />
-              </div>
-              <div className="space-y-1">
-                <Label>俱乐部（可选）</Label>
-                <Input placeholder="e.g. 铳义堂" {...register('club')} />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>取消</Button>
-              <Button type="submit" disabled={isSubmitting}>保存</Button>
-            </DialogFooter>
-          </form>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setOpen(false)}>取消</Button>
+                <Button type="submit" disabled={isSubmitting}>保存</Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>

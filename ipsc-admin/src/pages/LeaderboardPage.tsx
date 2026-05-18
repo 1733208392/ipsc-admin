@@ -103,7 +103,7 @@ export function LeaderboardPage() {
   const [divisions, setDivisions] = useState<Division[]>([])
   const [stages, setStages] = useState<Stage[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedDivision, setSelectedDivision] = useState<string>('overall')
+  const [selectedDivision, setSelectedDivision] = useState<string>('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedStage, setSelectedStage] = useState<string>('all')
   const { setCurrentMatch } = useMatch()
@@ -113,7 +113,7 @@ export function LeaderboardPage() {
   async function load() {
     try {
       const params = new URLSearchParams()
-      if (selectedDivision !== 'overall') params.set('division_id', selectedDivision)
+      if (selectedDivision && selectedDivision !== '') params.set('division_id', selectedDivision)
       if (selectedCategory !== 'all') params.set('category', selectedCategory)
       if (selectedStage !== 'all') params.set('stage_id', selectedStage)
       const qs = params.toString()
@@ -127,7 +127,12 @@ export function LeaderboardPage() {
       ])
 
       setRankings(leaderboardResp.rankings)
-      setDivisions(divsData.sort((a, b) => a.sort_order - b.sort_order))
+      const sortedDivs = divsData.sort((a, b) => a.sort_order - b.sort_order)
+      setDivisions(sortedDivs)
+      // Set default to first division if not already set
+      if (!selectedDivision && sortedDivs.length > 0) {
+        setSelectedDivision(String(sortedDivs[0].id))
+      }
       setStages(stagesData.sort((a, b) => a.sort_order - b.sort_order))
       setCurrentMatch(match)
     } catch (e) {
@@ -165,13 +170,6 @@ export function LeaderboardPage() {
         <>
           {/* Division Filter Row */}
           <div className="flex gap-1 flex-wrap mb-4">
-            <Button
-              variant={selectedDivision === 'overall' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setSelectedDivision('overall')}
-            >
-              Overall
-            </Button>
             {divisions.map(d => (
               <Button
                 key={d.id}

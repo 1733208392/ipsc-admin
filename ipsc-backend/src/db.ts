@@ -242,12 +242,12 @@ try {
 }
 
 // Migration: Ensure all matches have 5 default divisions
-import { DEFAULT_DIVISIONS } from './constants.js';
+import { DEFAULT_DIVISIONS, DIVISION_POWER_FACTOR } from './constants.js';
 
 try {
   const matches = db.prepare(`SELECT id FROM matches`).all() as Array<{ id: number }>;
   const insertDivision = db.prepare(
-    `INSERT INTO divisions (match_id, code, name, sort_order) VALUES (?, ?, ?, ?)`
+    `INSERT INTO divisions (match_id, code, name, power_factor, sort_order) VALUES (?, ?, ?, ?, ?)`
   );
 
   for (const match of matches) {
@@ -258,7 +258,8 @@ try {
         .get(match.id, division.code);
       if (!exists) {
         try {
-          insertDivision.run(match.id, division.code, division.name, division.sort_order);
+          const powerFactor = DIVISION_POWER_FACTOR[division.code];
+          insertDivision.run(match.id, division.code, division.name, powerFactor, division.sort_order);
         } catch {
           // If insert fails (e.g., duplicate), continue
         }

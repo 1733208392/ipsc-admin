@@ -62,7 +62,7 @@ export function DivisionsPage() {
     try {
       const [divs, subDivs, match] = await Promise.all([
         api.get<Division[]>(`/matches/${matchId}/divisions`),
-        api.get<SubDivision[]>(`/matches/${matchId}/sub-divisions`),
+        api.get<SubDivision[]>(`/matches/${matchId}/categories`),
         api.get<Match>(`/matches/${matchId}`),
       ])
       setDivisions(divs.sort((a, b) => a.sort_order - b.sort_order))
@@ -117,10 +117,10 @@ export function DivisionsPage() {
   async function onSubDivisionSubmit(data: SubDivisionFormData) {
     try {
       if (editingSubDivision) {
-        await api.put(`/sub-divisions/${editingSubDivision.id}`, data)
+        await api.put(`/categories/${editingSubDivision.id}`, data)
         toast({ title: '更新成功' })
       } else {
-        await api.post(`/matches/${matchId}/sub-divisions`, data)
+        await api.post(`/matches/${matchId}/categories`, data)
         toast({ title: '添加成功' })
       }
       setOpenSubDivision(false)
@@ -132,7 +132,7 @@ export function DivisionsPage() {
 
   async function deleteSubDivision(id: number) {
     try {
-      await api.delete(`/sub-divisions/${id}`)
+      await api.delete(`/categories/${id}`)
       toast({ title: '删除成功' })
       void load()
     } catch (e) {
@@ -140,7 +140,7 @@ export function DivisionsPage() {
     }
   }
 
-  const genderLabel = (g?: string) => g === 'male' ? '男' : g === 'female' ? '女' : '-'
+  const genderLabel = (g?: string | null) => g === 'male' ? '男' : g === 'female' ? '女' : '-'
   const ageRange = (sd: SubDivision) => {
     if (sd.min_age !== null && sd.max_age !== null) return `${sd.min_age}-${sd.max_age}`
     if (sd.min_age !== null) return `${sd.min_age}+`
@@ -167,16 +167,17 @@ export function DivisionsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>排序</TableHead>
                     <TableHead>Code</TableHead>
                     <TableHead>组别名称</TableHead>
                     <TableHead>Power Factor</TableHead>
-                    <TableHead>排序</TableHead>
                     <TableHead className="text-right">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {divisions.map(d => (
                     <TableRow key={d.id}>
+                      <TableCell>{d.sort_order}</TableCell>
                       <TableCell className="font-mono text-sm">{d.code}</TableCell>
                       <TableCell className="font-medium">{d.name}</TableCell>
                       <TableCell>
@@ -184,7 +185,6 @@ export function DivisionsPage() {
                           {d.power_factor === 'major' ? '🟠 major' : '🔵 minor'}
                         </Badge>
                       </TableCell>
-                      <TableCell>{d.sort_order}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="icon" onClick={() => openEditDivision(d)}>
                           <Pencil className="h-4 w-4" />
@@ -199,35 +199,35 @@ export function DivisionsPage() {
 
           <Separator className="my-8" />
 
-          {/* Sub-divisions Section */}
+          {/* Categories Section */}
           <div>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">次级别 (Sub Divisions)</h2>
+              <h2 className="text-lg font-semibold">分类 (Category)</h2>
               <Button onClick={openCreateSubDivision} size="sm">
                 <PlusCircle className="h-4 w-4 mr-2" />
-                添加次级别
+                添加分类
               </Button>
             </div>
             {subDivisions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">暂无次级别</div>
+              <div className="text-center py-8 text-muted-foreground">暂无分类</div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>排序</TableHead>
                     <TableHead>名称</TableHead>
                     <TableHead>年龄范围</TableHead>
                     <TableHead>性别</TableHead>
-                    <TableHead>排序</TableHead>
                     <TableHead className="text-right">操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {subDivisions.map(sd => (
                     <TableRow key={sd.id}>
+                      <TableCell>{sd.sort_order}</TableCell>
                       <TableCell className="font-medium">{sd.name}</TableCell>
                       <TableCell>{ageRange(sd)}</TableCell>
                       <TableCell>{genderLabel(sd.gender)}</TableCell>
-                      <TableCell>{sd.sort_order}</TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button variant="ghost" size="icon" onClick={() => openEditSubDivision(sd)}>
                           <Pencil className="h-4 w-4" />
@@ -294,11 +294,11 @@ export function DivisionsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Sub-division Create/Edit Dialog */}
+      {/* Category Create/Edit Dialog */}
       <Dialog open={openSubDivision} onOpenChange={setOpenSubDivision}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingSubDivision ? '编辑次级别' : '添加次级别'}</DialogTitle>
+            <DialogTitle>{editingSubDivision ? '编辑分类' : '添加分类'}</DialogTitle>
             <DialogDescription></DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubDivisionSubmit(onSubDivisionSubmit)} className="space-y-4">

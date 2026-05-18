@@ -4,7 +4,7 @@ import { CreateSubDivisionSchema, UpdateSubDivisionSchema, ok, fail } from '../t
 
 const router = Router({ mergeParams: true });
 
-// POST /matches/:matchId/sub-divisions
+// POST /matches/:matchId/categories
 router.post('/', (req: Request, res: Response) => {
   const matchId = Number(req.params['matchId']);
   const parsed = CreateSubDivisionSchema.safeParse(req.body);
@@ -29,7 +29,7 @@ router.post('/', (req: Request, res: Response) => {
   }
 });
 
-// GET /matches/:matchId/sub-divisions
+// GET /matches/:matchId/categories
 router.get('/', (req: Request, res: Response) => {
   const matchId = Number(req.params['matchId']);
   try {
@@ -42,7 +42,7 @@ router.get('/', (req: Request, res: Response) => {
   }
 });
 
-// PUT /sub-divisions/:id  (mounted at root level)
+// PUT /categories/:id  (mounted at root level)
 export function updateSubDivision(req: Request, res: Response): void {
   const id = Number(req.params['id']);
   const parsed = UpdateSubDivisionSchema.safeParse(req.body);
@@ -53,7 +53,7 @@ export function updateSubDivision(req: Request, res: Response): void {
   try {
     const subDiv = db.prepare(`SELECT * FROM sub_divisions WHERE id = ?`).get(id);
     if (!subDiv) {
-      res.status(404).json(fail('Sub division not found'));
+      res.status(404).json(fail('Category not found'));
       return;
     }
     const fields: string[] = [];
@@ -77,13 +77,13 @@ export function updateSubDivision(req: Request, res: Response): void {
   }
 }
 
-// DELETE /sub-divisions/:id
+// DELETE /categories/:id
 export function deleteSubDivision(req: Request, res: Response): void {
   const id = Number(req.params['id']);
   try {
     const subDiv = db.prepare(`SELECT * FROM sub_divisions WHERE id = ?`).get(id);
     if (!subDiv) {
-      res.status(404).json(fail('Sub division not found'));
+      res.status(404).json(fail('Category not found'));
       return;
     }
     db.prepare(`DELETE FROM sub_divisions WHERE id = ?`).run(id);

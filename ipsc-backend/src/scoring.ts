@@ -26,12 +26,18 @@ export interface ScoreResult {
   hitFactor: number;
 }
 
+export type ScoreStatus = 'normal' | 'dnf' | 'dq';
+
 export function calculateScore(
   hits: HitCounts,
   penalties: Penalties,
   totalTime: number,
-  powerFactor: PowerFactor
+  powerFactor: PowerFactor,
+  status: ScoreStatus = 'normal'
 ): ScoreResult {
+  if (status === 'dnf' || status === 'dq') {
+    return { totalPoints: 0, hitFactor: 0 };
+  }
   const pf = SCORING[powerFactor];
   const points = hits.A * pf.A + hits.C * pf.C + hits.D * pf.D;
   const penaltyPoints = (hits.M + hits.N) * 10 + penalties.PE * 10;

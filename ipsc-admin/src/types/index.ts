@@ -34,8 +34,25 @@ export interface Stage {
   match_id: number
   name: string
   min_rounds: number
-  max_points: number
+  stage_points: number
+  targets_count: number
+  poppers_plates_count: number
+  briefing_text: string
+  max_points?: number
   sort_order: number
+}
+
+export interface StageAttachment {
+  id: number
+  stage_id: number
+  match_id: number
+  filename: string
+  original_name: string
+  mime_type: string
+  size_bytes: number
+  storage_path: string
+  created_at: string
+  url: string
 }
 
 export interface Squad {
@@ -78,6 +95,9 @@ export interface Score {
   fastest_split: number | null
   total_points: number
   hit_factor: number
+  status: 'normal' | 'dnf' | 'dq'
+  review_state: 'draft' | 'submitted'
+  review_submitted_at: string | null
   confirmed: number
   created_at: string
   shooter_name?: string
@@ -86,7 +106,47 @@ export interface Score {
   division_name?: string
 }
 
+export interface ScoreCardRow {
+  row_type: 'paper' | 'steel'
+  row_no: number
+  a_hits: number
+  c_hits: number
+  d_hits: number
+  m_hits: number
+  ns_hits: number
+  npm_hits: number
+}
+
+export interface ScorePenaltyReason {
+  reason_code: string
+  reason_label: string
+  count: number
+  sort_order: number
+}
+
+export interface ScoreCardDetail {
+  shooter: {
+    id: number
+    match_id: number
+    division_id: number
+    name: string
+    bib_number: string
+  }
+  stage: {
+    id: number
+    match_id: number
+    name: string
+    targets_count: number
+    poppers_plates_count: number
+  }
+  score: Score | null
+  rows: ScoreCardRow[]
+  penalty_reasons: ScorePenaltyReason[]
+}
+
 export interface LeaderboardEntry {
+  rank?: number
+  rank_in_stage?: number
   id: number
   name: string
   bib_number: string
@@ -97,20 +157,22 @@ export interface LeaderboardEntry {
   division_id?: number
   division_code?: string
   division_name: string
-  power_factor: string
-  stages_shot: number
-  total_points: number
-  avg_hit_factor: number
-  stage_hit_factor?: number
-  stage_points?: number
-  stage_time?: number
-  a_hits?: number
-  c_hits?: number
-  d_hits?: number
-  m_hits?: number
-  n_hits?: number
-  pe?: number
-  confirmed?: number
+  power_factor?: string
+  stages_shot?: number
+  total_stage_points?: number
+  avg_percentage?: number
+  stage_details?: Record<string, {
+    percentage: number
+    stage_points_earned: number
+    hit_factor: number
+    rank_in_stage: number
+  }>
+  hit_factor?: number
+  percentage?: number
+  stage_points_earned?: number
+  stage_points_max?: number
+  total_points?: number
+  total_time?: number
 }
 
 export interface LeaderboardResponse {
@@ -118,6 +180,12 @@ export interface LeaderboardResponse {
     division: number | 'overall'
     category: string | null
     stage: number | null
+    sort_by?: 'stage_points' | 'percentage'
+  }
+  stage_info?: {
+    id: number
+    name: string
+    stage_points: number
   }
   rankings: LeaderboardEntry[]
 }

@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { api } from '@/lib/api'
 import { useMatch } from '@/hooks/useMatch'
 import { useToast } from '@/hooks/use-toast'
-import type { Stage, Match } from '@/types'
+import type { Stage, StageAttachment, Match } from '@/types'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,10 +20,40 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 const schema = z.object({
   name: z.string().min(1, '必填'),
   min_rounds: z.coerce.number().int().min(0).default(0),
-  max_points: z.coerce.number().int().min(0).default(0),
+  stage_points: z.coerce.number().int().min(0).default(0),
+  targets_count: z.coerce.number().int().min(0).default(0),
+  poppers_plates_count: z.coerce.number().int().min(0).default(0),
+  briefing_text: z.string().default(''),
   sort_order: z.coerce.number().int().default(0),
 })
 type FormData = z.infer<typeof schema>
+
+const BRIEFING_TEMPLATE = `Stage 简报模板
+
+1. 起始姿势
+- 射手站立于指定起始框内，自然站姿。
+- 双手手腕高于肩线，枪械按赛规装填并入套。
+
+2. 射击流程
+- 听到起始信号后，按可见顺序射击所有纸靶与钢靶。
+- 强制换弹区：无（除非 RO 现场另行说明）。
+- 如有漏靶、程序错误或安全违规，按赛规判罚。
+
+3. 计分方式
+- 计分制：Comstock。
+- 最低弹数：以该 Stage 公布的最低弹数为准。
+- 命中与罚分按现行 IPSC 规则执行。
+
+4. 安全要求
+- 全程遵守 180 度安全角规则。
+- 移动、换弹、排故时，手指必须离开扳机护圈。
+- 枪口不得指向身体或不安全方向。
+- 出现不安全动作时，RO 有权立即停止射手并判罚。
+
+5. 其他说明
+- 赛前可进行 Walkthrough，但不得进行实弹/空击演练（按场地规则）。
+- 对 Stage 程序有疑问请在开赛前向 RO 提问确认。
+`
 
 export function StagesPage() {
   const { id: matchId } = useParams<{ id: string }>()
@@ -31,13 +61,32 @@ export function StagesPage() {
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Stage | null>(null)
+  const [attachments, setAttachments] = useState<StageAttachment[]>([])
+  const [uploading, setUploading] = useState(false)
   const { setCurrentMatch } = useMatch()
   const { toast } = useToast()
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema) as Resolver<FormData>,
-    defaultValues: { min_rounds: 0, max_points: 0, sort_order: 0 },
+    defaultValues: {
+      min_rounds: 0,
+      stage_points: 0,
+      targets_count: 0,
+      poppers_plates_count: 0,
+      briefing_text: BRIEFING_TEMPLATE,
+      sort_order: 0,
+    },
   })
+
+  async function loadStageAttachments(stageId: number) {
+    try {
+      const data = await api.get<StageAttachment[]>(`/stages/${stageId}/attachments`)
+      setAttachments(data)
+    } catch (e) {
+      setAttachments([])
+      toast({ title: '附件加载失败', description: String(e), variant: 'destructive' })
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -59,13 +108,31 @@ export function StagesPage() {
 
   function openCreate() {
     setEditing(null)
-    reset({ name: '', min_rounds: 0, max_points: 0, sort_order: 0 })
+    setAttachments([])
+    reset({
+      name: '',
+      min_rounds: 0,
+      stage_points: 0,
+      targets_count: 0,
+      poppers_plates_count: 0,
+      briefing_text: BRIEFING_TEMPLATE,
+      sort_order: 0,
+    })
     setOpen(true)
   }
 
-  function openEdit(s: Stage) {
+  async function openEdit(s: Stage) {
     setEditing(s)
-    reset({ name: s.name, min_rounds: s.min_rounds, max_points: s.max_points, sort_order: s.sort_order })
+    reset({
+      name: s.name,
+      min_rounds: s.min_rounds,
+      stage_points: s.stage_points ?? s.max_points ?? 0,
+      targets_count: s.targets_count ?? 0,
+      poppers_plates_count: s.poppers_plates_count ?? 0,
+      briefing_text: s.briefing_text ?? BRIEFING_TEMPLATE,
+      sort_order: s.sort_order,
+    })
+    await loadStageAttachments(s.id)
     setOpen(true)
   }
 
@@ -95,6 +162,42 @@ export function StagesPage() {
     }
   }
 
+  async function handleUploadFiles(files: FileList | null) {
+    if (!editing || !files || files.length === 0) return
+
+    setUploading(true)
+    try {
+      for (const file of Array.from(files)) {
+        const form = new FormData()
+        form.append('file', file)
+        await api.postForm(`/stages/${editing.id}/attachments`, form)
+      }
+      toast({ title: '附件上传成功' })
+      await loadStageAttachments(editing.id)
+    } catch (e) {
+      toast({ title: '附件上传失败', description: String(e), variant: 'destructive' })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleDeleteAttachment(attachmentId: number) {
+    if (!editing) return
+    try {
+      await api.delete(`/stages/${editing.id}/attachments/${attachmentId}`)
+      toast({ title: '附件删除成功' })
+      await loadStageAttachments(editing.id)
+    } catch (e) {
+      toast({ title: '附件删除失败', description: String(e), variant: 'destructive' })
+    }
+  }
+
+  function formatFileSize(size: number): string {
+    if (size < 1024) return `${size} B`
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -113,20 +216,24 @@ export function StagesPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>排序</TableHead>
               <TableHead>Stage 名称</TableHead>
               <TableHead>Min Rounds</TableHead>
-              <TableHead>Max Points</TableHead>
-              <TableHead>排序</TableHead>
+              <TableHead>场景总分</TableHead>
+              <TableHead>Targets</TableHead>
+              <TableHead>Popers/Plates</TableHead>
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {stages.map(s => (
               <TableRow key={s.id}>
+                <TableCell>{s.sort_order}</TableCell>
                 <TableCell className="font-medium">{s.name}</TableCell>
                 <TableCell>{s.min_rounds}</TableCell>
-                <TableCell>{s.max_points}</TableCell>
-                <TableCell>{s.sort_order}</TableCell>
+                <TableCell>{s.stage_points ?? s.max_points ?? 0}</TableCell>
+                <TableCell>{s.targets_count ?? 0}</TableCell>
+                <TableCell>{s.poppers_plates_count ?? 0}</TableCell>
                 <TableCell className="text-right space-x-2">
                   <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
                     <Pencil className="h-4 w-4" />
@@ -172,13 +279,82 @@ export function StagesPage() {
                 <Input type="number" {...register('min_rounds')} />
               </div>
               <div className="space-y-1">
-                <Label>Max Points</Label>
-                <Input type="number" {...register('max_points')} />
+                <Label>场景总分</Label>
+                <Input type="number" {...register('stage_points')} />
               </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>number of Targets</Label>
+                <Input type="number" {...register('targets_count')} />
+              </div>
+              <div className="space-y-1">
+                <Label>number of Popers/Plates</Label>
+                <Input type="number" {...register('poppers_plates_count')} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Stage Briefing</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setValue('briefing_text', BRIEFING_TEMPLATE)}
+                >
+                  载入模板
+                </Button>
+              </div>
+              <textarea
+                className="flex min-h-40 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                placeholder="输入 Stage Briefing..."
+                {...register('briefing_text')}
+              />
             </div>
             <div className="space-y-1">
               <Label>排序</Label>
               <Input type="number" {...register('sort_order')} />
+            </div>
+            <div className="space-y-2 border rounded-md p-3">
+              <Label>附件（图片/PDF）</Label>
+              {editing ? (
+                <>
+                  <Input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    multiple
+                    disabled={uploading}
+                    onChange={(e) => void handleUploadFiles(e.target.files)}
+                  />
+                  {attachments.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">暂无附件</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {attachments.map((a) => (
+                        <div key={a.id} className="flex items-center justify-between gap-2 text-sm">
+                          <a href={a.url} target="_blank" rel="noreferrer" className="underline break-all">
+                            {a.original_name}
+                          </a>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-muted-foreground">{formatFileSize(a.size_bytes)}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive"
+                              onClick={() => void handleDeleteAttachment(a.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground">请先保存 Stage，再上传附件。</p>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>取消</Button>

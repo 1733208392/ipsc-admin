@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import fs from 'fs';
 import db from '../db.js';
 import { CreateStageSchema, UpdateStageSchema, ok, fail } from '../types.js';
+import { removeStageUploadsDir, resolveStoragePath } from '../services/stage-files.js';
 const router = Router({ mergeParams: true });
 // POST /matches/:matchId/stages
 router.post('/', (req, res) => {
@@ -16,10 +18,14 @@ router.post('/', (req, res) => {
         return;
     }
     try {
-        const { name, min_rounds, max_points, sort_order } = parsed.data;
+        const { name, min_rounds, stage_points, targets_count, poppers_plates_count, briefing_text, sort_order, } = parsed.data;
         const result = db
-            .prepare(`INSERT INTO stages (match_id, name, min_rounds, max_points, sort_order) VALUES (?, ?, ?, ?, ?)`)
-            .run(matchId, name, min_rounds, max_points, sort_order);
+            .prepare(`
+        INSERT INTO stages
+          (match_id, name, min_rounds, max_points, stage_points, targets_count, poppers_plates_count, briefing_text, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+            .run(matchId, name, min_rounds, stage_points, stage_points, targets_count, poppers_plates_count, briefing_text, sort_order);
         const stage = db.prepare(`SELECT * FROM stages WHERE id = ?`).get(result.lastInsertRowid);
         res.status(201).json(ok(stage));
     }
@@ -56,7 +62,7 @@ export function updateStage(req, res) {
         }
         const fields = [];
         const values = [];
-        const { name, min_rounds, max_points, sort_order } = parsed.data;
+        const { name, min_rounds, stage_points, targets_count, poppers_plates_count, briefing_text, sort_order, } = parsed.data;
         if (name !== undefined) {
             fields.push('name = ?');
             values.push(name);
@@ -65,9 +71,23 @@ export function updateStage(req, res) {
             fields.push('min_rounds = ?');
             values.push(min_rounds);
         }
-        if (max_points !== undefined) {
+        if (stage_points !== undefined) {
+            fields.push('stage_points = ?');
+            values.push(stage_points);
             fields.push('max_points = ?');
-            values.push(max_points);
+            values.push(stage_points);
+        }
+        if (targets_count !== undefined) {
+            fields.push('targets_count = ?');
+            values.push(targets_count);
+        }
+        if (poppers_plates_count !== undefined) {
+            fields.push('poppers_plates_count = ?');
+            values.push(poppers_plates_count);
+        }
+        if (briefing_text !== undefined) {
+            fields.push('briefing_text = ?');
+            values.push(briefing_text);
         }
         if (sort_order !== undefined) {
             fields.push('sort_order = ?');
@@ -95,6 +115,17 @@ export function deleteStage(req, res) {
             res.status(404).json(fail('Stage not found'));
             return;
         }
+        const attachments = db
+            .prepare(`SELECT storage_path FROM stage_attachments WHERE stage_id = ?`)
+            .all(id);
+        for (const attachment of attachments) {
+            const absolutePath = resolveStoragePath(attachment.storage_path);
+            if (fs.existsSync(absolutePath)) {
+                fs.unlinkSync(absolutePath);
+            }
+        }
+        db.prepare(`DELETE FROM stage_attachments WHERE stage_id = ?`).run(id);
+        removeStageUploadsDir(id);
         db.prepare(`DELETE FROM stages WHERE id = ?`).run(id);
         res.json(ok({ id }));
     }

@@ -17,6 +17,12 @@ export const DEFAULT_DIVISIONS = [
     { code: 'open', name: '开放 (Open)', sort_order: 3 },
     { code: 'classic', name: '经典 (Classic)', sort_order: 4 },
 ];
+export const DEFAULT_SUB_DIVISIONS = [
+    { name: '青少年 (Junior)', max_age: 21, sort_order: 0 },
+    { name: '老年 (Senior)', min_age: 55, max_age: 64, sort_order: 1 },
+    { name: '超级老年 (Super Senior)', min_age: 65, sort_order: 2 },
+    { name: '女子 (Lady)', gender: 'female', sort_order: 3 },
+];
 export function matchCategory(category, shooter) {
     if (category === 'lady')
         return shooter.gender === 'female';

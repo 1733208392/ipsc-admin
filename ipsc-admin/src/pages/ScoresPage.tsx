@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { CheckCircle2, Circle, Trash2 } from 'lucide-react'
 
 import { api } from '@/lib/api'
@@ -21,6 +21,7 @@ interface ScoreMatrix {
 
 export function ScoresPage() {
   const { id: matchId } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [scores, setScores] = useState<Score[]>([])
   const [shooters, setShooters] = useState<Shooter[]>([])
   const [stages, setStages] = useState<Stage[]>([])
@@ -77,6 +78,10 @@ export function ScoresPage() {
     }
   }
 
+  function openScoreCard(shooterId: number, stageId: number) {
+    navigate(`/matches/${matchId}/score-card?shooter_id=${shooterId}&stage_id=${stageId}`)
+  }
+
   // Build matrix
   const matrix: ScoreMatrix[] = shooters.map(shooter => {
     const stageScores: Record<number, Score | undefined> = {}
@@ -91,6 +96,9 @@ export function ScoresPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">成绩查看</h1>
+        <Button variant="outline" onClick={() => navigate(`/matches/${matchId}/score-card`)}>
+          打开评分卡
+        </Button>
       </div>
 
       <div className="mb-4 flex items-center gap-3">
@@ -135,7 +143,11 @@ export function ScoresPage() {
                   {stages.map(st => {
                     const sc = stageScores[st.id]
                     return (
-                      <TableCell key={st.id} className="text-center">
+                      <TableCell
+                        key={st.id}
+                        className="text-center cursor-pointer"
+                        onClick={() => openScoreCard(shooter.id, st.id)}
+                      >
                         {sc ? (
                           <div className="space-y-0.5">
                             <div className="text-sm font-medium">{sc.hit_factor.toFixed(4)}</div>
@@ -150,13 +162,21 @@ export function ScoresPage() {
                                     size="icon"
                                     className="h-5 w-5"
                                     title="确认"
-                                    onClick={() => void handleConfirm(sc.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      void handleConfirm(sc.id)
+                                    }}
                                   >
                                     <Circle className="h-3.5 w-3.5 text-muted-foreground" />
                                   </Button>
                                   <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                      <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-5 w-5 text-destructive"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
                                         <Trash2 className="h-3 w-3" />
                                       </Button>
                                     </AlertDialogTrigger>
@@ -178,7 +198,7 @@ export function ScoresPage() {
                             </div>
                           </div>
                         ) : (
-                          <span className="text-muted-foreground text-xs">—</span>
+                          <span className="text-muted-foreground text-xs">录入</span>
                         )}
                       </TableCell>
                     )

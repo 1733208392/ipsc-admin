@@ -8,6 +8,8 @@ import { StagesPage } from '@/pages/StagesPage'
 import { SquadsPage } from '@/pages/SquadsPage'
 import { ShootersPage } from '@/pages/ShootersPage'
 import { ScoresPage } from '@/pages/ScoresPage'
+import { ScoreCardPage } from '@/pages/ScoreCardPage'
+import { ScoreCardSummaryPage } from '@/pages/ScoreCardSummaryPage'
 import { LeaderboardPage } from '@/pages/LeaderboardPage'
 
 export default function App() {
@@ -22,6 +24,8 @@ export default function App() {
             <Route path="/matches/:id/squads" element={<SquadsPage />} />
             <Route path="/matches/:id/shooters" element={<ShootersPage />} />
             <Route path="/matches/:id/scores" element={<ScoresPage />} />
+            <Route path="/matches/:id/score-card" element={<ScoreCardPage />} />
+            <Route path="/matches/:id/score-card/summary" element={<ScoreCardSummaryPage />} />
             <Route path="/matches/:id/leaderboard" element={<LeaderboardPage />} />
           </Route>
         </Routes>

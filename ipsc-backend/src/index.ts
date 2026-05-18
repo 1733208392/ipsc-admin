@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import matchesRouter from './routes/matches.js';
 import divisionsRouter, { updateDivision, deleteDivision } from './routes/divisions.js';
@@ -25,13 +27,18 @@ import scoresRouter, {
   deleteScore,
 } from './routes/scores.js';
 import leaderboardRouter from './routes/leaderboard.js';
+import stageAttachmentsRouter from './routes/stage-attachments.js';
+import { getUploadsDir } from './services/stage-files.js';
 
 const app = express();
 const PORT = process.env['PORT'] ? Number(process.env['PORT']) : 3001;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const uploadsDir = path.resolve(__dirname, '..', getUploadsDir());
 
 // ── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(uploadsDir));
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 const api = express.Router();
@@ -44,13 +51,19 @@ api.use('/matches/:matchId/divisions', divisionsRouter);
 api.put('/divisions/:id', updateDivision);
 api.delete('/divisions/:id', deleteDivision);
 
-// Sub Divisions (nested + top-level)
+// Categories (legacy alias: sub-divisions)
+api.use('/matches/:matchId/categories', subDivisionsRouter);
+api.put('/categories/:id', updateSubDivision);
+api.delete('/categories/:id', deleteSubDivision);
+
+// Legacy Sub Divisions routes (kept for backward compatibility)
 api.use('/matches/:matchId/sub-divisions', subDivisionsRouter);
 api.put('/sub-divisions/:id', updateSubDivision);
 api.delete('/sub-divisions/:id', deleteSubDivision);
 
 // Stages (nested + top-level)
 api.use('/matches/:matchId/stages', stagesRouter);
+api.use('/stages/:id/attachments', stageAttachmentsRouter);
 api.put('/stages/:id', updateStage);
 api.delete('/stages/:id', deleteStage);
 

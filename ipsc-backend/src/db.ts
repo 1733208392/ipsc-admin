@@ -42,7 +42,23 @@ db.exec(`
     name TEXT NOT NULL,
     min_rounds INTEGER NOT NULL DEFAULT 0,
     max_points INTEGER NOT NULL DEFAULT 0,
+    stage_points INTEGER NOT NULL DEFAULT 0,
+    targets_count INTEGER NOT NULL DEFAULT 0,
+    poppers_plates_count INTEGER NOT NULL DEFAULT 0,
+    briefing_text TEXT NOT NULL DEFAULT '',
     sort_order INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS stage_attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    stage_id INTEGER NOT NULL REFERENCES stages(id) ON DELETE CASCADE,
+    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    original_name TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    storage_path TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS squads (
@@ -80,12 +96,41 @@ db.exec(`
     pe INTEGER NOT NULL DEFAULT 0,
     first_shot REAL,
     fastest_split REAL,
+    status TEXT NOT NULL DEFAULT 'normal' CHECK(status IN ('normal','dnf','dq')),
+    review_state TEXT NOT NULL DEFAULT 'draft' CHECK(review_state IN ('draft','submitted')),
+    review_submitted_at TEXT,
     total_points REAL NOT NULL DEFAULT 0,
     hit_factor REAL NOT NULL DEFAULT 0,
     confirmed INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(shooter_id, stage_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS score_card_rows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    score_id INTEGER NOT NULL REFERENCES scores(id) ON DELETE CASCADE,
+    row_type TEXT NOT NULL CHECK(row_type IN ('paper','steel')),
+    row_no INTEGER NOT NULL,
+    a_hits INTEGER NOT NULL DEFAULT 0,
+    c_hits INTEGER NOT NULL DEFAULT 0,
+    d_hits INTEGER NOT NULL DEFAULT 0,
+    m_hits INTEGER NOT NULL DEFAULT 0,
+    ns_hits INTEGER NOT NULL DEFAULT 0,
+    npm_hits INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(score_id, row_type, row_no)
+  );
+
+  CREATE TABLE IF NOT EXISTS score_penalties (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    score_id INTEGER NOT NULL REFERENCES scores(id) ON DELETE CASCADE,
+    reason_code TEXT NOT NULL,
+    reason_label TEXT NOT NULL,
+    count INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(score_id, reason_code)
   );
 
   CREATE TABLE IF NOT EXISTS sub_divisions (
@@ -103,6 +148,38 @@ db.exec(`
 // Divisions table migration (idempotent)
 const divisionColumns = db.prepare(`PRAGMA table_info(divisions)`).all() as Array<{ name: string }>;
 const existingDivisionColumns = new Set(divisionColumns.map((c) => c.name));
+
+// Stages table migration (idempotent)
+const stageColumns = db.prepare(`PRAGMA table_info(stages)`).all() as Array<{ name: string }>;
+const existingStageColumns = new Set(stageColumns.map((c) => c.name));
+
+if (!existingStageColumns.has('max_points')) {
+  db.exec(`ALTER TABLE stages ADD COLUMN max_points INTEGER NOT NULL DEFAULT 0`);
+}
+
+if (!existingStageColumns.has('stage_points')) {
+  db.exec(`ALTER TABLE stages ADD COLUMN stage_points INTEGER NOT NULL DEFAULT 0`);
+  db.exec(`UPDATE stages SET stage_points = max_points`);
+}
+
+if (!existingStageColumns.has('targets_count')) {
+  db.exec(`ALTER TABLE stages ADD COLUMN targets_count INTEGER NOT NULL DEFAULT 0`);
+}
+
+if (!existingStageColumns.has('poppers_plates_count')) {
+  db.exec(`ALTER TABLE stages ADD COLUMN poppers_plates_count INTEGER NOT NULL DEFAULT 0`);
+}
+
+if (!existingStageColumns.has('briefing_text')) {
+  db.exec(`ALTER TABLE stages ADD COLUMN briefing_text TEXT NOT NULL DEFAULT ''`);
+}
+
+db.exec(`UPDATE stages SET max_points = stage_points WHERE max_points = 0 AND stage_points > 0`);
+db.exec(`UPDATE stages SET stage_points = max_points WHERE stage_points = 0 AND max_points > 0`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_stage_attachments_stage_id ON stage_attachments(stage_id)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_stage_attachments_match_id ON stage_attachments(match_id)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_score_card_rows_score_id ON score_card_rows(score_id)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_score_penalties_score_id ON score_penalties(score_id)`);
 
 if (!existingDivisionColumns.has('code')) {
   db.exec(`ALTER TABLE divisions ADD COLUMN code TEXT`);
@@ -195,6 +272,18 @@ existingShooterColumns = new Set(shooterColumns.map((c) => c.name));
 const scoresColumns = db.prepare(`PRAGMA table_info(scores)`).all() as Array<{ name: string }>;
 const existingScoresColumns = new Set(scoresColumns.map((c) => c.name));
 
+if (!existingScoresColumns.has('status')) {
+  db.exec(`ALTER TABLE scores ADD COLUMN status TEXT NOT NULL DEFAULT 'normal'`);
+}
+if (!existingScoresColumns.has('review_state')) {
+  db.exec(`ALTER TABLE scores ADD COLUMN review_state TEXT NOT NULL DEFAULT 'draft'`);
+}
+if (!existingScoresColumns.has('review_submitted_at')) {
+  db.exec(`ALTER TABLE scores ADD COLUMN review_submitted_at TEXT`);
+}
+db.exec(`UPDATE scores SET status = 'normal' WHERE status IS NULL OR status = ''`);
+db.exec(`UPDATE scores SET review_state = 'draft' WHERE review_state IS NULL OR review_state = ''`);
+
 // Check if we need to recreate scores table for proper foreign key constraint
 // This is a simplified check - we just try to delete a non-existent shooter to verify the constraint
 try {
@@ -225,6 +314,9 @@ try {
           pe INTEGER NOT NULL DEFAULT 0,
           first_shot REAL,
           fastest_split REAL,
+          status TEXT NOT NULL DEFAULT 'normal' CHECK(status IN ('normal','dnf','dq')),
+          review_state TEXT NOT NULL DEFAULT 'draft' CHECK(review_state IN ('draft','submitted')),
+          review_submitted_at TEXT,
           total_points REAL NOT NULL DEFAULT 0,
           hit_factor REAL NOT NULL DEFAULT 0,
           confirmed INTEGER NOT NULL DEFAULT 0,
@@ -234,8 +326,8 @@ try {
         )
       `);
       db.exec(`
-        INSERT INTO scores_new (id, match_id, shooter_id, stage_id, total_time, a_hits, c_hits, d_hits, m_hits, n_hits, pe, first_shot, fastest_split, total_points, hit_factor, confirmed, created_at, updated_at)
-        SELECT id, match_id, shooter_id, stage_id, total_time, a_hits, c_hits, d_hits, m_hits, n_hits, pe, first_shot, fastest_split, total_points, hit_factor, confirmed, created_at, updated_at
+        INSERT INTO scores_new (id, match_id, shooter_id, stage_id, total_time, a_hits, c_hits, d_hits, m_hits, n_hits, pe, first_shot, fastest_split, status, review_state, review_submitted_at, total_points, hit_factor, confirmed, created_at, updated_at)
+        SELECT id, match_id, shooter_id, stage_id, total_time, a_hits, c_hits, d_hits, m_hits, n_hits, pe, first_shot, fastest_split, COALESCE(status, 'normal'), COALESCE(review_state, 'draft'), review_submitted_at, total_points, hit_factor, confirmed, created_at, updated_at
         FROM scores
       `);
       db.exec(`DROP TABLE scores`);

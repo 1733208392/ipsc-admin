@@ -60,6 +60,11 @@ export function AppSidebar() {
               成绩
             </NavLink>
 
+            <NavLink to={`/matches/${matchId}/score-card`} className={navLinkClass}>
+              <ClipboardList className="h-4 w-4" />
+              评分卡
+            </NavLink>
+
             <NavLink to={`/matches/${matchId}/leaderboard`} className={navLinkClass}>
               <Trophy className="h-4 w-4" />
               积分榜

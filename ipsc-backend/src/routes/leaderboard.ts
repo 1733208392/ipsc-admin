@@ -1,25 +1,51 @@
 import { Router, Request, Response } from 'express';
 import db from '../db.js';
 import { ok, fail } from '../types.js';
+import {
+  calculateOverallRanking,
+  calculateStageRanking,
+  type CategoryFilter,
+} from '../services/ranking.js';
 
 const router = Router({ mergeParams: true });
 
-// GET /matches/:matchId/leaderboard?division_id=&sub_division_id=&stage_id=
+function parseCategory(category: string | undefined): CategoryFilter | undefined {
+  if (!category) return undefined;
+
+  switch (category) {
+    case 'lady':
+      return { gender: 'female' };
+    case 'junior':
+      return { maxAge: 21 };
+    case 'senior':
+      return { minAge: 55 };
+    case 'super_senior':
+      return { minAge: 65 };
+    default:
+      return undefined;
+  }
+}
+
+// GET /matches/:matchId/leaderboard?division_id=&category=&stage_id=&sort_by=
 router.get('/', (req: Request, res: Response) => {
   const matchId = Number(req.params['matchId']);
   const divisionParam = req.query['division_id'] as string | undefined;
-  const subDivisionParam = req.query['sub_division_id'] as string | undefined;
+  const categoryParam = req.query['category'] as string | undefined;
   const stageIdParam = req.query['stage_id'] as string | undefined;
+  const sortByParam = (req.query['sort_by'] as string | undefined) ?? 'stage_points';
 
-  const divisionId = divisionParam ? Number(divisionParam) : null;
-  if (divisionParam && (!Number.isInteger(divisionId) || (divisionId as number) <= 0)) {
+  const sortBy = sortByParam === 'percentage' ? 'percentage' : 'stage_points';
+
+  const isOverall = !divisionParam || divisionParam === 'overall';
+  const divisionId = isOverall ? null : Number(divisionParam);
+
+  if (!isOverall && (!Number.isInteger(divisionId) || (divisionId as number) <= 0)) {
     res.status(400).json(fail('division_id must be a positive integer'));
     return;
   }
 
-  const subDivisionId = subDivisionParam ? Number(subDivisionParam) : null;
-  if (subDivisionParam && (!Number.isInteger(subDivisionId) || (subDivisionId as number) <= 0)) {
-    res.status(400).json(fail('sub_division_id must be a positive integer'));
+  if (categoryParam && !['lady', 'junior', 'senior', 'super_senior'].includes(categoryParam)) {
+    res.status(400).json(fail('category must be one of: lady, junior, senior, super_senior'));
     return;
   }
 
@@ -36,112 +62,145 @@ router.get('/', (req: Request, res: Response) => {
       return;
     }
 
-    // If sub_division_id is specified, get its criteria
-    let subDivisionCriteria: { min_age?: number | null; max_age?: number | null; gender?: string | null } | null = null;
-    if (subDivisionId !== null) {
-      const subDiv = db.prepare(`SELECT min_age, max_age, gender FROM sub_divisions WHERE id = ? AND match_id = ?`).get(subDivisionId, matchId);
-      if (!subDiv) {
-        res.status(404).json(fail('Sub division not found'));
-        return;
-      }
-      subDivisionCriteria = subDiv as any;
-    }
-
-    let sql: string;
-    const params: unknown[] = [];
+    const categoryFilter = parseCategory(categoryParam);
 
     if (stageId !== null) {
-      sql = `
-        SELECT
-          s.id,
-          s.name,
-          s.bib_number,
-          s.age,
-          s.gender,
-          s.region,
-          s.club,
-          d.id AS division_id,
-          d.code AS division_code,
-          d.name AS division_name,
-          sc.hit_factor AS stage_hit_factor,
-          sc.total_points AS stage_points,
-          sc.total_time AS stage_time,
-          sc.a_hits,
-          sc.c_hits,
-          sc.d_hits,
-          sc.m_hits,
-          sc.n_hits,
-          sc.pe,
-          sc.confirmed
-        FROM shooters s
-        JOIN divisions d ON s.division_id = d.id
-        JOIN scores sc ON s.id = sc.shooter_id AND sc.stage_id = ?
-        WHERE s.match_id = ?
-      `;
-      params.push(stageId, matchId);
+      const stageInfo = db
+        .prepare(`
+          SELECT id, name, COALESCE(stage_points, max_points, 0) AS stage_points
+          FROM stages
+          WHERE id = ? AND match_id = ?
+        `)
+        .get(stageId, matchId) as { id: number; name: string; stage_points: number } | undefined;
+
+      if (!stageInfo) {
+        res.status(404).json(fail('Stage not found'));
+        return;
+      }
+
+      const stageRanking = calculateStageRanking(matchId, stageId, divisionId, categoryFilter);
+      const shooterIds = stageRanking.map((item) => item.shooter_id);
+      const shooterMap = new Map<number, {
+        id: number;
+        name: string;
+        bib_number: string;
+        age: number | null;
+        gender: string | null;
+        region: string | null;
+        club: string | null;
+        division_id: number;
+        division_code: string;
+        division_name: string;
+      }>();
+
+      if (shooterIds.length > 0) {
+        const placeholders = shooterIds.map(() => '?').join(',');
+        const shooters = db
+          .prepare(`
+            SELECT
+              s.id,
+              s.name,
+              s.bib_number,
+              s.age,
+              s.gender,
+              s.region,
+              s.club,
+              d.id AS division_id,
+              d.code AS division_code,
+              d.name AS division_name
+            FROM shooters s
+            JOIN divisions d ON s.division_id = d.id
+            WHERE s.id IN (${placeholders})
+          `)
+          .all(...shooterIds) as Array<{
+          id: number;
+          name: string;
+          bib_number: string;
+          age: number | null;
+          gender: string | null;
+          region: string | null;
+          club: string | null;
+          division_id: number;
+          division_code: string;
+          division_name: string;
+        }>;
+        shooters.forEach((s) => shooterMap.set(s.id, s));
+      }
+
+      const rankings = stageRanking
+        .map((item) => {
+          const shooter = shooterMap.get(item.shooter_id);
+          if (!shooter) return null;
+          return {
+            rank_in_stage: item.rank_in_stage,
+            id: shooter.id,
+            name: shooter.name,
+            bib_number: shooter.bib_number,
+            age: shooter.age,
+            gender: shooter.gender,
+            region: shooter.region,
+            club: shooter.club,
+            division_id: shooter.division_id,
+            division_code: shooter.division_code,
+            division_name: shooter.division_name,
+            hit_factor: item.hit_factor,
+            percentage: item.percentage,
+            stage_points_earned: item.stage_points_earned,
+            stage_points_max: item.stage_points_max,
+            total_points: item.total_points,
+            total_time: item.total_time,
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null)
+        .sort((a, b) => {
+          if (b.percentage !== a.percentage) return b.percentage - a.percentage;
+          if (b.hit_factor !== a.hit_factor) return b.hit_factor - a.hit_factor;
+          return String(a.bib_number).localeCompare(String(b.bib_number));
+        })
+        .map((item, idx) => ({
+          ...item,
+          rank_in_stage: idx + 1,
+        }));
+
+      res.json(
+        ok({
+          filters: {
+            division: isOverall ? 'overall' : (divisionId as number),
+            category: categoryParam ?? null,
+            stage: stageId,
+            sort_by: sortBy,
+          },
+          stage_info: stageInfo,
+          rankings,
+        })
+      );
     } else {
-      sql = `
-        SELECT
-          s.id,
-          s.name,
-          s.bib_number,
-          s.age,
-          s.gender,
-          s.region,
-          s.club,
-          d.id AS division_id,
-          d.code AS division_code,
-          d.name AS division_name,
-          COUNT(sc.id) AS stages_shot,
-          COALESCE(SUM(sc.total_points), 0) AS total_points,
-          COALESCE(AVG(sc.hit_factor), 0) AS avg_hit_factor
-        FROM shooters s
-        JOIN divisions d ON s.division_id = d.id
-        LEFT JOIN scores sc ON s.id = sc.shooter_id
-        WHERE s.match_id = ?
-      `;
-      params.push(matchId);
-    }
+      const rankings = calculateOverallRanking(matchId, divisionId, categoryFilter)
+        .sort((a, b) => {
+          if (sortBy === 'percentage') {
+            if (b.avg_percentage !== a.avg_percentage) return b.avg_percentage - a.avg_percentage;
+          } else {
+            if (b.total_stage_points !== a.total_stage_points) return b.total_stage_points - a.total_stage_points;
+          }
+          return String(a.bib_number).localeCompare(String(b.bib_number));
+        })
+        .map((item, idx) => ({
+          rank: idx + 1,
+          ...item,
+        }));
 
-    if (divisionId !== null) {
-      sql += ` AND s.division_id = ?`;
-      params.push(divisionId);
+      res.json(
+        ok({
+          filters: {
+            division: isOverall ? 'overall' : (divisionId as number),
+            category: categoryParam ?? null,
+            stage: null,
+            sort_by: sortBy,
+          },
+          rankings,
+        })
+      );
     }
-
-    // Apply sub-division criteria
-    if (subDivisionCriteria !== null) {
-      if (subDivisionCriteria.gender !== null) {
-        sql += ` AND s.gender = ?`;
-        params.push(subDivisionCriteria.gender);
-      }
-      if (subDivisionCriteria.min_age !== null) {
-        sql += ` AND s.age IS NOT NULL AND s.age >= ?`;
-        params.push(subDivisionCriteria.min_age);
-      }
-      if (subDivisionCriteria.max_age !== null) {
-        sql += ` AND s.age IS NOT NULL AND s.age < ?`;
-        params.push(subDivisionCriteria.max_age);
-      }
-    }
-
-    if (stageId === null) {
-      sql += ` GROUP BY s.id, d.id`;
-      sql += ` ORDER BY total_points DESC, avg_hit_factor DESC, s.bib_number ASC`;
-    } else {
-      sql += ` ORDER BY sc.hit_factor DESC, sc.total_points DESC, s.bib_number ASC`;
-    }
-
-    const rankings = db.prepare(sql).all(...params);
-    res.json(
-      ok({
-        filters: {
-          division: divisionId,
-          sub_division: subDivisionId,
-          stage: stageId,
-        },
-        rankings,
-      })
-    );
   } catch (err) {
     res.status(500).json(fail(String(err)));
   }

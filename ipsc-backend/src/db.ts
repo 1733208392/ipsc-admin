@@ -241,4 +241,32 @@ try {
   // If migration fails, continue - the table may have correct constraints already
 }
 
+// Migration: Ensure all matches have 5 default divisions
+import { DEFAULT_DIVISIONS } from './constants.js';
+
+try {
+  const matches = db.prepare(`SELECT id FROM matches`).all() as Array<{ id: number }>;
+  const insertDivision = db.prepare(
+    `INSERT INTO divisions (match_id, code, name, sort_order) VALUES (?, ?, ?, ?)`
+  );
+
+  for (const match of matches) {
+    for (const division of DEFAULT_DIVISIONS) {
+      // Only insert if it doesn't already exist (check by match_id and code)
+      const exists = db
+        .prepare(`SELECT 1 FROM divisions WHERE match_id = ? AND code = ?`)
+        .get(match.id, division.code);
+      if (!exists) {
+        try {
+          insertDivision.run(match.id, division.code, division.name, division.sort_order);
+        } catch {
+          // If insert fails (e.g., duplicate), continue
+        }
+      }
+    }
+  }
+} catch {
+  // If migration fails, continue
+}
+
 export default db;

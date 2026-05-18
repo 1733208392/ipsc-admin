@@ -3,6 +3,7 @@ import cors from 'cors';
 
 import matchesRouter from './routes/matches.js';
 import divisionsRouter, { updateDivision, deleteDivision } from './routes/divisions.js';
+import subDivisionsRouter, { updateSubDivision, deleteSubDivision } from './routes/sub-divisions.js';
 import stagesRouter, { updateStage, deleteStage } from './routes/stages.js';
 import squadsRouter, {
   updateSquad,
@@ -42,6 +43,11 @@ api.use('/matches', matchesRouter);
 api.use('/matches/:matchId/divisions', divisionsRouter);
 api.put('/divisions/:id', updateDivision);
 api.delete('/divisions/:id', deleteDivision);
+
+// Sub Divisions (nested + top-level)
+api.use('/matches/:matchId/sub-divisions', subDivisionsRouter);
+api.put('/sub-divisions/:id', updateSubDivision);
+api.delete('/sub-divisions/:id', deleteSubDivision);
 
 // Stages (nested + top-level)
 api.use('/matches/:matchId/stages', stagesRouter);

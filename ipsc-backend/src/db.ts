@@ -87,6 +87,17 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(shooter_id, stage_id)
   );
+
+  CREATE TABLE IF NOT EXISTS sub_divisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    min_age INTEGER,
+    max_age INTEGER,
+    gender TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 // Divisions table migration (idempotent)
@@ -260,6 +271,34 @@ try {
         try {
           const powerFactor = DIVISION_POWER_FACTOR[division.code];
           insertDivision.run(match.id, division.code, division.name, powerFactor, division.sort_order);
+        } catch {
+          // If insert fails (e.g., duplicate), continue
+        }
+      }
+    }
+  }
+} catch {
+  // If migration fails, continue
+}
+
+// Migration: Ensure all matches have default sub-divisions
+import { DEFAULT_SUB_DIVISIONS } from './constants.js';
+
+try {
+  const matches = db.prepare(`SELECT id FROM matches`).all() as Array<{ id: number }>;
+  const insertSubDivision = db.prepare(
+    `INSERT INTO sub_divisions (match_id, name, min_age, max_age, gender, sort_order) VALUES (?, ?, ?, ?, ?, ?)`
+  );
+
+  for (const match of matches) {
+    for (const subDiv of DEFAULT_SUB_DIVISIONS) {
+      // Only insert if it doesn't already exist (check by match_id and name)
+      const exists = db
+        .prepare(`SELECT 1 FROM sub_divisions WHERE match_id = ? AND name = ?`)
+        .get(match.id, subDiv.name);
+      if (!exists) {
+        try {
+          insertSubDivision.run(match.id, subDiv.name, subDiv.min_age ?? null, subDiv.max_age ?? null, subDiv.gender ?? null, subDiv.sort_order);
         } catch {
           // If insert fails (e.g., duplicate), continue
         }

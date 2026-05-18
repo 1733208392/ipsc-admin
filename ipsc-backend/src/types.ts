@@ -30,6 +30,23 @@ export const UpdateDivisionSchema = z.object({
   sort_order: z.number().int().optional(),
 });
 
+// ── Sub Divisions (Categories) ────────────────────────────────────────────────
+export const CreateSubDivisionSchema = z.object({
+  name: z.string().min(1),
+  min_age: z.number().int().min(0).optional(),
+  max_age: z.number().int().min(0).optional(),
+  gender: z.enum(['male', 'female']).optional(),
+  sort_order: z.number().int().optional().default(0),
+});
+
+export const UpdateSubDivisionSchema = z.object({
+  name: z.string().min(1).optional(),
+  min_age: z.number().int().min(0).optional(),
+  max_age: z.number().int().min(0).optional(),
+  gender: z.enum(['male', 'female']).optional(),
+  sort_order: z.number().int().optional(),
+});
+
 // ── Stages ────────────────────────────────────────────────────────────────────
 export const CreateStageSchema = z.object({
   name: z.string().min(1),
@@ -124,6 +141,8 @@ export type UpdateMatch = z.infer<typeof UpdateMatchSchema>;
 export type MatchStatus = z.infer<typeof MatchStatusSchema>;
 export type CreateDivision = z.infer<typeof CreateDivisionSchema>;
 export type UpdateDivision = z.infer<typeof UpdateDivisionSchema>;
+export type CreateSubDivision = z.infer<typeof CreateSubDivisionSchema>;
+export type UpdateSubDivision = z.infer<typeof UpdateSubDivisionSchema>;
 export type CreateStage = z.infer<typeof CreateStageSchema>;
 export type UpdateStage = z.infer<typeof UpdateStageSchema>;
 export type CreateSquad = z.infer<typeof CreateSquadSchema>;

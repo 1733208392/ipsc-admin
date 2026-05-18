@@ -18,6 +18,17 @@ export interface Division {
   sort_order: number
 }
 
+export interface SubDivision {
+  id: number
+  match_id: number
+  name: string
+  min_age: number | null
+  max_age: number | null
+  gender: 'male' | 'female' | null
+  sort_order: number
+  created_at?: string
+}
+
 export interface Stage {
   id: number
   match_id: number

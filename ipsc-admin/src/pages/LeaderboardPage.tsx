@@ -4,21 +4,13 @@ import { useParams } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { useMatch } from '@/hooks/useMatch'
 import { useToast } from '@/hooks/use-toast'
-import type { LeaderboardEntry, LeaderboardResponse, Division, Stage, Match } from '@/types'
+import type { LeaderboardEntry, LeaderboardResponse, Division, SubDivision, Stage, Match } from '@/types'
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
 const medals = ['🥇', '🥈', '🥉']
-
-const CATEGORY_LABELS: Record<string, string> = {
-  all: '全部',
-  junior: '青少年',
-  senior: '老年',
-  super_senior: '超级老年',
-  lady: '女子',
-}
 
 function LeaderboardTable({ entries, selectedStage }: { entries: LeaderboardEntry[]; selectedStage: string }) {
   if (entries.length === 0) {
@@ -101,10 +93,11 @@ export function LeaderboardPage() {
   const { id: matchId } = useParams<{ id: string }>()
   const [rankings, setRankings] = useState<LeaderboardEntry[]>([])
   const [divisions, setDivisions] = useState<Division[]>([])
+  const [subDivisions, setSubDivisions] = useState<SubDivision[]>([])
   const [stages, setStages] = useState<Stage[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDivision, setSelectedDivision] = useState<string>('')
-  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [selectedSubDivision, setSelectedSubDivision] = useState<string>('')
   const [selectedStage, setSelectedStage] = useState<string>('all')
   const { setCurrentMatch } = useMatch()
   const { toast } = useToast()
@@ -114,14 +107,15 @@ export function LeaderboardPage() {
     try {
       const params = new URLSearchParams()
       if (selectedDivision && selectedDivision !== '') params.set('division_id', selectedDivision)
-      if (selectedCategory !== 'all') params.set('category', selectedCategory)
+      if (selectedSubDivision && selectedSubDivision !== '') params.set('sub_division_id', selectedSubDivision)
       if (selectedStage !== 'all') params.set('stage_id', selectedStage)
       const qs = params.toString()
       const url = `/matches/${matchId}/leaderboard${qs ? `?${qs}` : ''}`
 
-      const [leaderboardResp, divsData, stagesData, match] = await Promise.all([
+      const [leaderboardResp, divsData, subDivsData, stagesData, match] = await Promise.all([
         api.get<LeaderboardResponse>(url),
         api.get<Division[]>(`/matches/${matchId}/divisions`),
+        api.get<SubDivision[]>(`/matches/${matchId}/sub-divisions`),
         api.get<Stage[]>(`/matches/${matchId}/stages`),
         api.get<Match>(`/matches/${matchId}`),
       ])
@@ -132,6 +126,12 @@ export function LeaderboardPage() {
       // Set default to first division if not already set
       if (!selectedDivision && sortedDivs.length > 0) {
         setSelectedDivision(String(sortedDivs[0].id))
+      }
+      const sortedSubDivs = subDivsData.sort((a, b) => a.sort_order - b.sort_order)
+      setSubDivisions(sortedSubDivs)
+      // Set default to first sub-division if not already set
+      if (!selectedSubDivision && sortedSubDivs.length > 0) {
+        setSelectedSubDivision(String(sortedSubDivs[0].id))
       }
       setStages(stagesData.sort((a, b) => a.sort_order - b.sort_order))
       setCurrentMatch(match)
@@ -145,7 +145,7 @@ export function LeaderboardPage() {
   useEffect(() => {
     setLoading(true)
     void load()
-  }, [selectedDivision, selectedCategory, selectedStage, matchId])
+  }, [selectedDivision, selectedSubDivision, selectedStage, matchId])
 
   useEffect(() => {
     intervalRef.current = setInterval(() => {
@@ -155,7 +155,7 @@ export function LeaderboardPage() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [selectedDivision, selectedCategory, selectedStage, matchId])
+  }, [selectedDivision, selectedSubDivision, selectedStage, matchId])
 
   return (
     <div>
@@ -182,16 +182,16 @@ export function LeaderboardPage() {
             ))}
           </div>
 
-          {/* Category Filter Row */}
+          {/* Category/Sub-division Filter Row */}
           <div className="flex gap-1 flex-wrap mb-4">
-            {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+            {subDivisions.map(sd => (
               <Button
-                key={value}
-                variant={selectedCategory === value ? 'secondary' : 'ghost'}
+                key={sd.id}
+                variant={selectedSubDivision === String(sd.id) ? 'secondary' : 'ghost'}
                 size="sm"
-                onClick={() => setSelectedCategory(value)}
+                onClick={() => setSelectedSubDivision(String(sd.id))}
               >
-                {label}
+                {sd.name}
               </Button>
             ))}
           </div>

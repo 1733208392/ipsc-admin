@@ -304,6 +304,45 @@ router.get('/', (req, res) => {
         res.status(500).json(fail(String(err)));
     }
 });
+// PUT /matches/:matchId/scores/:scoreId/confirm
+router.put('/:scoreId/confirm', (req, res) => {
+    const matchId = Number(req.params['matchId']);
+    const scoreId = Number(req.params['scoreId']);
+    try {
+        const score = db
+            .prepare(`SELECT id FROM scores WHERE id = ? AND match_id = ?`)
+            .get(scoreId, matchId);
+        if (!score) {
+            res.status(404).json(fail('Score not found in this match'));
+            return;
+        }
+        db.prepare(`UPDATE scores SET confirmed = 1, updated_at = datetime('now') WHERE id = ?`).run(scoreId);
+        const updated = db.prepare(`SELECT * FROM scores WHERE id = ?`).get(scoreId);
+        res.json(ok(updated));
+    }
+    catch (err) {
+        res.status(500).json(fail(String(err)));
+    }
+});
+// DELETE /matches/:matchId/scores/:scoreId
+router.delete('/:scoreId', (req, res) => {
+    const matchId = Number(req.params['matchId']);
+    const scoreId = Number(req.params['scoreId']);
+    try {
+        const score = db
+            .prepare(`SELECT id FROM scores WHERE id = ? AND match_id = ?`)
+            .get(scoreId, matchId);
+        if (!score) {
+            res.status(404).json(fail('Score not found in this match'));
+            return;
+        }
+        db.prepare(`DELETE FROM scores WHERE id = ?`).run(scoreId);
+        res.json(ok({ id: scoreId }));
+    }
+    catch (err) {
+        res.status(500).json(fail(String(err)));
+    }
+});
 // GET /matches/:matchId/scores/score-card?shooter_id=&stage_id=
 router.get('/score-card', (req, res) => {
     const matchId = Number(req.params['matchId']);

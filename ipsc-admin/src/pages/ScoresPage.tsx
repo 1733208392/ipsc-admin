@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { CheckCircle2, Circle, Trash2 } from 'lucide-react'
+import { CheckCircle2, Circle, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import { useMatch } from '@/hooks/useMatch'
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 interface ScoreMatrix {
   shooter: Shooter
-  stageScores: Record<number, Score | undefined>
+  stageScores: Record<number, Score[]>
   totalPoints: number
 }
 
@@ -28,6 +28,8 @@ export function ScoresPage() {
   const [squads, setSquads] = useState<Squad[]>([])
   const [loading, setLoading] = useState(true)
   const [filterSquad, setFilterSquad] = useState<string>('all')
+  const [filterStage, setFilterStage] = useState<string>('all')
+  const [expandedAttempts, setExpandedAttempts] = useState<Record<string, boolean>>({})
   const { setCurrentMatch } = useMatch()
   const { toast } = useToast()
 
@@ -59,8 +61,9 @@ export function ScoresPage() {
   useEffect(() => { void load() }, [matchId, filterSquad])
 
   async function handleConfirm(id: number) {
+    if (!matchId) return
     try {
-      await api.put(`/scores/${id}/confirm`, {})
+      await api.put(`/matches/${matchId}/scores/${id}/confirm`, {})
       toast({ title: '成绩已确认' })
       void load()
     } catch (e) {
@@ -69,8 +72,9 @@ export function ScoresPage() {
   }
 
   async function handleDelete(id: number) {
+    if (!matchId) return
     try {
-      await api.delete(`/scores/${id}`)
+      await api.delete(`/matches/${matchId}/scores/${id}`)
       toast({ title: '删除成功' })
       void load()
     } catch (e) {
@@ -82,15 +86,34 @@ export function ScoresPage() {
     navigate(`/matches/${matchId}/score-card?shooter_id=${shooterId}&stage_id=${stageId}`)
   }
 
+  function toggleAttempts(shooterId: number, stageId: number) {
+    const key = `${shooterId}-${stageId}`
+    setExpandedAttempts((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }))
+  }
+
   // Build matrix
   const matrix: ScoreMatrix[] = shooters.map(shooter => {
-    const stageScores: Record<number, Score | undefined> = {}
+    const stageScores: Record<number, Score[]> = {}
     stages.forEach(stage => {
-      stageScores[stage.id] = scores.find(sc => sc.shooter_id === shooter.id && sc.stage_id === stage.id)
+      stageScores[stage.id] = scores
+        .filter(sc => sc.shooter_id === shooter.id && sc.stage_id === stage.id)
+        .sort((a, b) => {
+          const at = a.submitted_at ? new Date(a.submitted_at).getTime() : 0
+          const bt = b.submitted_at ? new Date(b.submitted_at).getTime() : 0
+          if (bt !== at) return bt - at
+          return b.id - a.id
+        })
     })
-    const totalPoints = Object.values(stageScores).reduce((sum, sc) => sum + (sc?.total_points ?? 0), 0)
+    const totalPoints = Object.values(stageScores).reduce((sum, list) => sum + (list[0]?.total_points ?? 0), 0)
     return { shooter, stageScores, totalPoints }
   })
+
+  const visibleStages = filterStage === 'all'
+    ? stages
+    : stages.filter((stage) => String(stage.id) === filterStage)
 
   return (
     <div>
@@ -114,11 +137,24 @@ export function ScoresPage() {
             ))}
           </SelectContent>
         </Select>
+
+        <Label className="shrink-0 ml-2">按 Stage 筛选</Label>
+        <Select value={filterStage} onValueChange={setFilterStage}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="全部 Stage" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部 Stage</SelectItem>
+            {stages.map(st => (
+              <SelectItem key={st.id} value={String(st.id)}>{st.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {loading ? (
         <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-12 bg-muted rounded animate-pulse" />)}</div>
-      ) : matrix.length === 0 || stages.length === 0 ? (
+      ) : matrix.length === 0 || visibleStages.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">暂无数据</div>
       ) : (
         <div className="overflow-x-auto">
@@ -128,7 +164,7 @@ export function ScoresPage() {
                 <TableHead className="sticky left-0 bg-background">Bib</TableHead>
                 <TableHead className="sticky left-12 bg-background">姓名</TableHead>
                 <TableHead>Squad</TableHead>
-                {stages.map(st => (
+                {visibleStages.map(st => (
                   <TableHead key={st.id} className="text-center min-w-[110px]">{st.name}</TableHead>
                 ))}
                 <TableHead className="text-right font-semibold">总分</TableHead>
@@ -140,8 +176,11 @@ export function ScoresPage() {
                   <TableCell className="sticky left-0 bg-background font-mono">{shooter.bib_number}</TableCell>
                   <TableCell className="sticky left-12 bg-background">{shooter.name}</TableCell>
                   <TableCell>{shooter.squad_name}</TableCell>
-                  {stages.map(st => {
-                    const sc = stageScores[st.id]
+                  {visibleStages.map(st => {
+                    const attempts = stageScores[st.id] ?? []
+                    const sc = attempts[0]
+                    const expandKey = `${shooter.id}-${st.id}`
+                    const isExpanded = !!expandedAttempts[expandKey]
                     return (
                       <TableCell
                         key={st.id}
@@ -152,6 +191,21 @@ export function ScoresPage() {
                           <div className="space-y-0.5">
                             <div className="text-sm font-medium">{sc.hit_factor.toFixed(4)}</div>
                             <div className="text-xs text-muted-foreground">{sc.total_time.toFixed(2)}s</div>
+                            {attempts.length > 1 ? (
+                              <div className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleAttempts(shooter.id, st.id)
+                                  }}
+                                >
+                                  {attempts.length} 次提交
+                                  {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                </button>
+                              </div>
+                            ) : null}
                             <div className="flex items-center justify-center gap-1">
                               {sc.confirmed ? (
                                 <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
@@ -196,6 +250,40 @@ export function ScoresPage() {
                                 </>
                               )}
                             </div>
+                            {attempts.length > 1 && isExpanded ? (
+                              <div className="mt-1 space-y-1" onClick={(e) => e.stopPropagation()}>
+                                {attempts.slice(1).map((attempt, idx) => (
+                                  <div key={attempt.id} className="flex items-center justify-center gap-1 text-[10px]">
+                                    <span className="text-muted-foreground">#{idx + 2}</span>
+                                    <span>{attempt.hit_factor.toFixed(3)}</span>
+                                    <span className="text-muted-foreground">/{attempt.total_time.toFixed(2)}s</span>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-4 w-4 text-destructive"
+                                        >
+                                          <Trash2 className="h-2.5 w-2.5" />
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>删除历史成绩？</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            {shooter.name} / {st.name} / 提交 #{idx + 2}
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>取消</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => void handleDelete(attempt.id)} className="bg-destructive text-white hover:bg-destructive/90">删除</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
                           </div>
                         ) : (
                           <span className="text-muted-foreground text-xs">录入</span>

@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import matchesRouter from './routes/matches.js';
+import matchesRouter, { deleteMatch } from './routes/matches.js';
 import divisionsRouter, { updateDivision, deleteDivision } from './routes/divisions.js';
 import subDivisionsRouter, { updateSubDivision, deleteSubDivision } from './routes/sub-divisions.js';
 import stagesRouter, { updateStage, deleteStage } from './routes/stages.js';
@@ -40,6 +40,7 @@ app.use('/uploads', express.static(uploadsDir));
 const api = express.Router();
 
 // Matches
+api.delete('/matches/:id', deleteMatch);
 api.use('/matches', matchesRouter);
 
 // Divisions (nested + top-level)
@@ -85,6 +86,9 @@ api.get('/shooters/:shooterId/scores', getShooterScores);
 
 // Leaderboard
 api.use('/matches/:matchId/leaderboard', leaderboardRouter);
+
+// 强制匹配DELETE /matches/:id 避免Express 5路由问题
+app.delete('/api/v1/matches/:id', deleteMatch);
 
 app.use('/api/v1', api);
 

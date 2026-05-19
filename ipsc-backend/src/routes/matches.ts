@@ -165,7 +165,7 @@ router.patch('/:id/status', (req: Request, res: Response) => {
 });
 
 // DELETE /matches/:id
-router.delete('/:id', (req: Request, res: Response) => {
+export function deleteMatch(req: Request, res: Response): void {
   const id = Number(req.params['id']);
   try {
     const match = db.prepare(`SELECT * FROM matches WHERE id = ?`).get(id);
@@ -179,6 +179,8 @@ router.delete('/:id', (req: Request, res: Response) => {
   } catch (err) {
     res.status(500).json(fail(String(err)));
   }
-});
+}
+
+router.delete('/:id', deleteMatch);
 
 export default router;

@@ -12,6 +12,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 
 const rowFields = [
   { key: 'a_hits',  label: 'A',  headerClass: 'bg-green-500/15',  valueClass: 'text-green-600'  },
@@ -246,6 +257,17 @@ export function ScoreCardPage() {
     navigate(`/matches/${matchId}/score-card/summary?shooter_id=${selectedShooterId}&stage_id=${selectedStageId}`)
   }
 
+  async function handleDeleteSelectedScore() {
+    if (!matchId || !selectedScoreId || !selectedShooterId || !selectedStageId) return
+    try {
+      await api.delete(`/matches/${matchId}/scores/${selectedScoreId}`)
+      toast({ title: '成绩已删除' })
+      await loadScoreCard(selectedShooterId, selectedStageId)
+    } catch (e) {
+      toast({ title: '删除失败', description: String(e), variant: 'destructive' })
+    }
+  }
+
   function onChangeShooter(value: string) {
     setSelectedShooterId(value)
     const next = new URLSearchParams(searchParams)
@@ -433,6 +455,32 @@ export function ScoreCardPage() {
         <Button type="button" variant={status === 'dnf' ? 'destructive' : 'outline'} onClick={() => setStatus(status === 'dnf' ? 'normal' : 'dnf')}>
           DNF
         </Button>
+        {selectedScoreId ? (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button type="button" variant="destructive" disabled={saving || loading || detailLoading}>
+                删除当前成绩
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>删除当前成绩？</AlertDialogTitle>
+                <AlertDialogDescription>
+                  将删除当前选中的成绩提交，操作不可撤销。
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>取消</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-white hover:bg-destructive/90"
+                  onClick={() => void handleDeleteSelectedScore()}
+                >
+                  删除
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : null}
         <Button type="button" variant="outline" onClick={() => void saveDraft()} disabled={saving || loading || detailLoading}>
           Save Draft
         </Button>

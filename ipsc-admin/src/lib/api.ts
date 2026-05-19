@@ -1,30 +1,39 @@
 const API_BASE = '/api/v1'
+const TOKEN_STORAGE_KEY = 'ipsc_admin_token'
+
+let accessToken: string | null = typeof window !== 'undefined'
+  ? window.localStorage.getItem(TOKEN_STORAGE_KEY)
+  : null
+
+export function setToken(token: string | null) {
+  accessToken = token
+  if (typeof window === 'undefined') return
+  if (token) {
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, token)
+  } else {
+    window.localStorage.removeItem(TOKEN_STORAGE_KEY)
+  }
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const isFormData = options?.body instanceof FormData
   const defaultHeaders: HeadersInit | undefined = isFormData ? undefined : { 'Content-Type': 'application/json' }
+  const authHeader: HeadersInit | undefined = accessToken
+    ? { Authorization: `Bearer ${accessToken}` }
+    : undefined
 
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: defaultHeaders,
+    headers: {
+      ...(defaultHeaders ?? {}),
+      ...(authHeader ?? {}),
+      ...(options?.headers ?? {}),
+    },
     ...options,
   })
-  const contentType = res.headers.get('content-type') || ''
-  const isJson = contentType.includes('application/json')
-
   if (!res.ok) {
-    if (isJson) {
-      const err = await res.json().catch(() => ({ error: 'Network error' }))
-      throw new Error((err as { error?: string }).error || `HTTP ${res.status}`)
-    }
-
-    const text = await res.text().catch(() => '')
-    throw new Error(text ? `HTTP ${res.status}: ${text.slice(0, 120)}` : `HTTP ${res.status}`)
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error((err as { error?: string }).error || `HTTP ${res.status}`)
   }
-
-  if (!isJson) {
-    throw new Error(`Unexpected response type: ${contentType || 'unknown'}`)
-  }
-
   const json = await res.json()
   return (json as { data: T }).data
 }

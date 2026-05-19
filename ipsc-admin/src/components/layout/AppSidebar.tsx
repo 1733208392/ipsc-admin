@@ -1,8 +1,9 @@
 import { NavLink, useParams } from 'react-router-dom'
-import { Target, List, Users, Layers, Group, Trophy, ClipboardList } from 'lucide-react'
+import { Target, List, Users, Layers, Group, Trophy, ClipboardList, LogOut, Building2, UserCog, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMatch } from '@/hooks/useMatch'
 import { Separator } from '@/components/ui/separator'
+import { useAuth } from '@/hooks/useAuth'
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -13,6 +14,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 export function AppSidebar() {
   const { id } = useParams<{ id: string }>()
   const { currentMatch } = useMatch()
+  const { user, logout } = useAuth()
   const matchId = id ?? currentMatch?.id
 
   return (
@@ -23,6 +25,25 @@ export function AppSidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2 space-y-1">
+        {user?.role === 'super_admin' ? (
+          <>
+            <p className="px-3 py-1 text-xs text-muted-foreground font-medium uppercase tracking-wide">平台管理</p>
+            <NavLink to="/admin/clubs" className={navLinkClass}>
+              <Building2 className="h-4 w-4" />
+              俱乐部管理
+            </NavLink>
+            <NavLink to="/admin/users" className={navLinkClass}>
+              <UserCog className="h-4 w-4" />
+              用户管理
+            </NavLink>
+            <NavLink to="/admin/matches" className={navLinkClass}>
+              <Shield className="h-4 w-4" />
+              全平台赛事
+            </NavLink>
+            <Separator className="my-2" />
+          </>
+        ) : null}
+
         <NavLink to="/" className={navLinkClass} end>
           <List className="h-4 w-4" />
           赛事列表
@@ -72,6 +93,17 @@ export function AppSidebar() {
           </>
         )}
       </nav>
+
+      <div className="p-2 border-t">
+        <button
+          type="button"
+          className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+          onClick={() => void logout()}
+        >
+          <LogOut className="h-4 w-4" />
+          退出登录
+        </button>
+      </div>
     </aside>
   )
 }

@@ -1,5 +1,6 @@
 export interface Match {
   id: number
+  club_id: number
   name: string
   date: string
   status: 'draft' | 'active' | 'completed'
@@ -7,6 +8,52 @@ export interface Match {
   divisions_count?: number
   stages_count?: number
   squads_count?: number
+  club_name?: string
+  club_short_name?: string
+}
+
+export interface Club {
+  id: number
+  name: string
+  short_name: string
+  contact_name: string | null
+  contact_phone: string | null
+  status: 'active' | 'inactive'
+  created_at: string
+  updated_at: string
+}
+
+export type UserRole = 'super_admin' | 'club_admin' | 'shooter'
+
+export interface UserAccount {
+  id: number
+  username: string
+  role: UserRole
+  club_id: number | null
+  name: string
+  phone: string | null
+  status: 'active' | 'inactive'
+  last_login_at?: string | null
+  club_name?: string | null
+  club_short_name?: string | null
+}
+
+export interface LoginResult {
+  token: string
+  user: UserAccount
+}
+
+export interface GlobalShooter {
+  uid: string
+  name: string
+  gender: 'male' | 'female'
+  age: number | null
+  region: string | null
+  default_club_id: number | null
+  id_card: string | null
+  phone: string | null
+  default_club_name?: string | null
+  default_club_short_name?: string | null
 }
 
 export interface Division {
@@ -68,8 +115,10 @@ export interface Shooter {
   match_id: number
   division_id: number
   squad_id: number | null
+  shooter_uid?: string | null
   name: string
   bib_number: string
+  category_code?: 'J' | 'S' | 'SJ' | 'L' | null
   age: number | null
   gender: 'male' | 'female' | null
   region: string | null
@@ -152,6 +201,7 @@ export interface LeaderboardEntry {
   id: number
   name: string
   bib_number: string
+  category_code?: 'J' | 'S' | 'SJ' | 'L' | null
   age: number | null
   gender: string | null
   region: string | null

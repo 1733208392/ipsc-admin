@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import matchesRouter, { deleteMatch } from './routes/matches.js';
+import matchesRouter from './routes/matches.js';
 import divisionsRouter, { updateDivision, deleteDivision } from './routes/divisions.js';
 import subDivisionsRouter, { updateSubDivision, deleteSubDivision } from './routes/sub-divisions.js';
 import stagesRouter, { updateStage, deleteStage } from './routes/stages.js';
@@ -21,7 +21,11 @@ import shootersRouter, {
   changeShooterSquad,
   deleteShooter,
 } from './routes/shooters.js';
-import scoresRouter, { getShooterScores } from './routes/scores.js';
+import scoresRouter, {
+  getShooterScores,
+  confirmScore,
+  deleteScore,
+} from './routes/scores.js';
 import leaderboardRouter from './routes/leaderboard.js';
 import stageAttachmentsRouter from './routes/stage-attachments.js';
 import { getUploadsDir } from './services/stage-files.js';
@@ -40,7 +44,6 @@ app.use('/uploads', express.static(uploadsDir));
 const api = express.Router();
 
 // Matches
-api.delete('/matches/:id', deleteMatch);
 api.use('/matches', matchesRouter);
 
 // Divisions (nested + top-level)
@@ -83,12 +86,11 @@ api.delete('/shooters/:id', deleteShooter);
 // Scores
 api.use('/matches/:matchId/scores', scoresRouter);
 api.get('/shooters/:shooterId/scores', getShooterScores);
+api.put('/scores/:id/confirm', confirmScore);
+api.delete('/scores/:id', deleteScore);
 
 // Leaderboard
 api.use('/matches/:matchId/leaderboard', leaderboardRouter);
-
-// 强制匹配DELETE /matches/:id 避免Express 5路由问题
-app.delete('/api/v1/matches/:id', deleteMatch);
 
 app.use('/api/v1', api);
 

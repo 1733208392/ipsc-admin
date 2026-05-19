@@ -10,17 +10,45 @@ router.post('/', (req, res) => {
         res.status(400).json(fail(parsed.error.message));
         return;
     }
-    const match = db.prepare(`SELECT id FROM matches WHERE id = ?`).get(matchId);
+    const match = db.prepare(`SELECT id, club_id FROM matches WHERE id = ?`).get(matchId);
     if (!match) {
         res.status(404).json(fail('Match not found'));
         return;
     }
     try {
-        const { division_id, squad_id, name, bib_number, age, gender, region, club } = parsed.data;
+        const { division_id, squad_id, shooter_uid, name, bib_number, category_code, age, gender, region, club } = parsed.data;
+        let resolvedName = name;
+        let resolvedAge = age;
+        let resolvedGender = gender;
+        let resolvedRegion = region;
+        let resolvedClub = club;
+        if (shooter_uid) {
+            const globalShooter = db
+                .prepare(`SELECT * FROM shooters_global WHERE uid = ?`)
+                .get(shooter_uid);
+            if (!globalShooter) {
+                res.status(404).json(fail('Global shooter not found'));
+                return;
+            }
+            const defaultClub = globalShooter.default_club_id
+                ? db
+                    .prepare(`SELECT short_name FROM clubs WHERE id = ?`)
+                    .get(globalShooter.default_club_id)
+                : undefined;
+            resolvedName = resolvedName ?? globalShooter.name;
+            resolvedAge = resolvedAge ?? (globalShooter.age ?? undefined);
+            resolvedGender = resolvedGender ?? globalShooter.gender;
+            resolvedRegion = resolvedRegion ?? (globalShooter.region ?? undefined);
+            resolvedClub = resolvedClub ?? defaultClub?.short_name;
+        }
+        if (!resolvedName) {
+            res.status(400).json(fail('Name is required when shooter_uid is not provided'));
+            return;
+        }
         const result = db
-            .prepare(`INSERT INTO shooters (match_id, division_id, squad_id, name, bib_number, age, gender, region, club)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-            .run(matchId, division_id, squad_id ?? null, name, bib_number, age ?? null, gender ?? null, region ?? null, club ?? null);
+            .prepare(`INSERT INTO shooters (match_id, division_id, squad_id, shooter_uid, name, bib_number, category_code, age, gender, region, club, club_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(matchId, division_id, squad_id ?? null, shooter_uid ?? null, resolvedName, bib_number, category_code ?? null, resolvedAge ?? null, resolvedGender ?? null, resolvedRegion ?? null, resolvedClub ?? null, match.club_id);
         const shooter = db.prepare(`SELECT * FROM shooters WHERE id = ?`).get(result.lastInsertRowid);
         res.status(201).json(ok(shooter));
     }
@@ -76,7 +104,7 @@ export function updateShooter(req, res) {
         }
         const fields = [];
         const values = [];
-        const { division_id, squad_id, name, bib_number, age, gender, region, club } = parsed.data;
+        const { division_id, squad_id, shooter_uid, name, bib_number, category_code, age, gender, region, club } = parsed.data;
         if (division_id !== undefined) {
             fields.push('division_id = ?');
             values.push(division_id);
@@ -85,6 +113,10 @@ export function updateShooter(req, res) {
             fields.push('squad_id = ?');
             values.push(squad_id);
         }
+        if (shooter_uid !== undefined) {
+            fields.push('shooter_uid = ?');
+            values.push(shooter_uid);
+        }
         if (name !== undefined) {
             fields.push('name = ?');
             values.push(name);
@@ -92,6 +124,10 @@ export function updateShooter(req, res) {
         if (bib_number !== undefined) {
             fields.push('bib_number = ?');
             values.push(bib_number);
+        }
+        if (category_code !== undefined) {
+            fields.push('category_code = ?');
+            values.push(category_code);
         }
         if (age !== undefined) {
             fields.push('age = ?');

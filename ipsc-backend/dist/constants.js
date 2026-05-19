@@ -8,7 +8,7 @@ export const DIVISION_POWER_FACTOR = {
 export const CATEGORY_THRESHOLDS = {
     junior: { max_age: 21 },
     senior: { min_age: 55 },
-    super_senior: { min_age: 65 },
+    super_junior: { min_age: 65 },
 };
 export const DEFAULT_DIVISIONS = [
     { code: 'production', name: '原厂 (Production)', sort_order: 0 },
@@ -20,7 +20,7 @@ export const DEFAULT_DIVISIONS = [
 export const DEFAULT_SUB_DIVISIONS = [
     { name: '青少年 (Junior)', max_age: 21, sort_order: 0 },
     { name: '老年 (Senior)', min_age: 55, max_age: 64, sort_order: 1 },
-    { name: '超级老年 (Super Senior)', min_age: 65, sort_order: 2 },
+    { name: '超级青年 (Super Junior)', min_age: 65, sort_order: 2 },
     { name: '女子 (Lady)', gender: 'female', sort_order: 3 },
 ];
 export function matchCategory(category, shooter) {

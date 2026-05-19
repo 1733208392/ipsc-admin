@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { api } from '@/lib/api'
 import { useMatch } from '@/hooks/useMatch'
 import { useToast } from '@/hooks/use-toast'
-import type { Shooter, Division, Squad, Match } from '@/types'
+import type { Shooter, Division, Squad, Match, GlobalShooter } from '@/types'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,11 +18,26 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
+const shooterCategoryOptions = [
+  { value: 'J', label: 'J - Junior' },
+  { value: 'S', label: 'S - Senior' },
+  { value: 'SJ', label: 'SJ - Super Junior' },
+  { value: 'L', label: 'L - Lady' },
+] as const
+
+function shooterCategoryLabel(value: Shooter['category_code']): string {
+  if (!value) return '-'
+  const found = shooterCategoryOptions.find((item) => item.value === value)
+  return found ? found.label : value
+}
+
 const schema = z.object({
   bib_number: z.string().min(1, '必填'),
+  shooter_uid: z.string().optional(),
   name: z.string().min(1, '必填'),
   division_id: z.coerce.number().int().positive('请选择组别'),
   squad_id: z.coerce.number().int().positive().optional(),
+  category_code: z.enum(['J', 'S', 'SJ', 'L']).optional(),
   age: z.coerce.number().int().min(0).max(120).optional(),
   gender: z.enum(['male', 'female']).optional(),
   region: z.string().max(50).optional(),
@@ -39,6 +54,7 @@ export function ShootersPage() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Shooter | null>(null)
   const [filterSquad, setFilterSquad] = useState<string>('all')
+  const [searchingGlobal, setSearchingGlobal] = useState(false)
   const { setCurrentMatch } = useMatch()
   const { toast } = useToast()
 
@@ -73,17 +89,19 @@ export function ShootersPage() {
 
   function openCreate() {
     setEditing(null)
-    reset({ bib_number: '', name: '', division_id: 0, squad_id: undefined, age: undefined, gender: undefined, region: '', club: '' })
+    reset({ shooter_uid: '', bib_number: '', name: '', division_id: 0, squad_id: undefined, category_code: undefined, age: undefined, gender: undefined, region: '', club: '' })
     setOpen(true)
   }
 
   function openEdit(s: Shooter) {
     setEditing(s)
     reset({ 
+      shooter_uid: s.shooter_uid ?? '',
       bib_number: s.bib_number, 
       name: s.name, 
       division_id: s.division_id, 
       squad_id: s.squad_id ?? undefined,
+      category_code: s.category_code ?? undefined,
       age: s.age ?? undefined,
       gender: s.gender ?? undefined,
       region: s.region ?? '',
@@ -105,6 +123,35 @@ export function ShootersPage() {
       void load()
     } catch (e) {
       toast({ title: '操作失败', description: String(e), variant: 'destructive' })
+    }
+  }
+
+  async function handleGlobalLookup() {
+    const uid = (watch('shooter_uid') || '').trim()
+    if (!uid) {
+      toast({ title: '请输入 UID', variant: 'destructive' })
+      return
+    }
+
+    setSearchingGlobal(true)
+    try {
+      const rows = await api.get<GlobalShooter[]>(`/shooters/global/search?q=${encodeURIComponent(uid)}`)
+      const shooter = rows.find((item) => item.uid === uid)
+      if (!shooter) {
+        toast({ title: '未找到该 UID', variant: 'destructive' })
+        return
+      }
+
+      setValue('name', shooter.name)
+      setValue('age', shooter.age ?? undefined)
+      setValue('gender', shooter.gender)
+      setValue('region', shooter.region ?? '')
+      setValue('club', shooter.default_club_short_name ?? shooter.default_club_name ?? '')
+      toast({ title: '已自动填充射手信息' })
+    } catch (e) {
+      toast({ title: '查询失败', description: String(e), variant: 'destructive' })
+    } finally {
+      setSearchingGlobal(false)
     }
   }
 
@@ -154,6 +201,7 @@ export function ShootersPage() {
               <TableHead>Bib</TableHead>
               <TableHead>姓名</TableHead>
               <TableHead>组别</TableHead>
+              <TableHead>类别</TableHead>
               <TableHead>年龄</TableHead>
               <TableHead>性别</TableHead>
               <TableHead>区域</TableHead>
@@ -167,6 +215,7 @@ export function ShootersPage() {
                 <TableCell className="font-mono font-medium">{s.bib_number}</TableCell>
                 <TableCell>{s.name}</TableCell>
                 <TableCell>{s.division_name}</TableCell>
+                <TableCell>{shooterCategoryLabel(s.category_code)}</TableCell>
                 <TableCell>{s.age ?? '-'}</TableCell>
                 <TableCell>{s.gender === 'male' ? '男' : s.gender === 'female' ? '女' : '-'}</TableCell>
                 <TableCell>{s.region ?? '-'}</TableCell>
@@ -209,6 +258,16 @@ export function ShootersPage() {
             <div className="text-center py-8 text-muted-foreground">正在加载组别数据...</div>
           ) : (
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <div className="space-y-1">
+                <Label>全局 UID（可选）</Label>
+                <div className="flex gap-2">
+                  <Input {...register('shooter_uid')} placeholder="SHOOTER-000001" />
+                  <Button type="button" variant="outline" onClick={() => void handleGlobalLookup()} disabled={searchingGlobal}>
+                    {searchingGlobal ? '查询中...' : '全局查询'}
+                  </Button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <Label>Bib 号</Label>
@@ -256,6 +315,23 @@ export function ShootersPage() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="space-y-1">
+                <Label>类别（可选）</Label>
+                <Select
+                  value={watch('category_code') ?? 'none'}
+                  onValueChange={v => setValue('category_code', v === 'none' ? undefined : v as 'J' | 'S' | 'SJ' | 'L')}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择类别" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">不选</SelectItem>
+                    {shooterCategoryOptions.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">

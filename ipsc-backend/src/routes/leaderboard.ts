@@ -14,13 +14,13 @@ function parseCategory(category: string | undefined): CategoryFilter | undefined
 
   switch (category) {
     case 'lady':
-      return { gender: 'female' };
+      return { categoryCode: 'L' };
     case 'junior':
-      return { maxAge: 21 };
+      return { categoryCode: 'J' };
     case 'senior':
-      return { minAge: 55 };
-    case 'super_senior':
-      return { minAge: 65 };
+      return { categoryCode: 'S' };
+    case 'super_junior':
+      return { categoryCode: 'SJ' };
     default:
       return undefined;
   }
@@ -44,8 +44,8 @@ router.get('/', (req: Request, res: Response) => {
     return;
   }
 
-  if (categoryParam && !['lady', 'junior', 'senior', 'super_senior'].includes(categoryParam)) {
-    res.status(400).json(fail('category must be one of: lady, junior, senior, super_senior'));
+  if (categoryParam && !['lady', 'junior', 'senior', 'super_junior'].includes(categoryParam)) {
+    res.status(400).json(fail('category must be one of: lady, junior, senior, super_junior'));
     return;
   }
 
@@ -84,6 +84,7 @@ router.get('/', (req: Request, res: Response) => {
         id: number;
         name: string;
         bib_number: string;
+        category_code: 'J' | 'S' | 'SJ' | 'L' | null;
         age: number | null;
         gender: string | null;
         region: string | null;
@@ -101,6 +102,7 @@ router.get('/', (req: Request, res: Response) => {
               s.id,
               s.name,
               s.bib_number,
+              s.category_code,
               s.age,
               s.gender,
               s.region,
@@ -116,6 +118,7 @@ router.get('/', (req: Request, res: Response) => {
           id: number;
           name: string;
           bib_number: string;
+          category_code: 'J' | 'S' | 'SJ' | 'L' | null;
           age: number | null;
           gender: string | null;
           region: string | null;
@@ -136,6 +139,7 @@ router.get('/', (req: Request, res: Response) => {
             id: shooter.id,
             name: shooter.name,
             bib_number: shooter.bib_number,
+            category_code: shooter.category_code,
             age: shooter.age,
             gender: shooter.gender,
             region: shooter.region,

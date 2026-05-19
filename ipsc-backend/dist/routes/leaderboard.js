@@ -8,13 +8,13 @@ function parseCategory(category) {
         return undefined;
     switch (category) {
         case 'lady':
-            return { gender: 'female' };
+            return { categoryCode: 'L' };
         case 'junior':
-            return { maxAge: 21 };
+            return { categoryCode: 'J' };
         case 'senior':
-            return { minAge: 55 };
-        case 'super_senior':
-            return { minAge: 65 };
+            return { categoryCode: 'S' };
+        case 'super_junior':
+            return { categoryCode: 'SJ' };
         default:
             return undefined;
     }
@@ -33,8 +33,8 @@ router.get('/', (req, res) => {
         res.status(400).json(fail('division_id must be a positive integer'));
         return;
     }
-    if (categoryParam && !['lady', 'junior', 'senior', 'super_senior'].includes(categoryParam)) {
-        res.status(400).json(fail('category must be one of: lady, junior, senior, super_senior'));
+    if (categoryParam && !['lady', 'junior', 'senior', 'super_junior'].includes(categoryParam)) {
+        res.status(400).json(fail('category must be one of: lady, junior, senior, super_junior'));
         return;
     }
     const stageId = stageIdParam ? Number(stageIdParam) : null;
@@ -72,6 +72,7 @@ router.get('/', (req, res) => {
               s.id,
               s.name,
               s.bib_number,
+              s.category_code,
               s.age,
               s.gender,
               s.region,
@@ -96,6 +97,7 @@ router.get('/', (req, res) => {
                     id: shooter.id,
                     name: shooter.name,
                     bib_number: shooter.bib_number,
+                    category_code: shooter.category_code,
                     age: shooter.age,
                     gender: shooter.gender,
                     region: shooter.region,

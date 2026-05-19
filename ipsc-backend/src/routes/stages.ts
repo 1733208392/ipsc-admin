@@ -66,39 +66,6 @@ router.get('/', (req: Request, res: Response) => {
   }
 });
 
-// DELETE /matches/:matchId/stages/:stageId
-router.delete('/:stageId', (req: Request, res: Response) => {
-  const matchId = Number(req.params['matchId']);
-  const stageId = Number(req.params['stageId']);
-  try {
-    const stage = db
-      .prepare(`SELECT id, match_id FROM stages WHERE id = ?`)
-      .get(stageId) as { id: number; match_id: number } | undefined;
-    if (!stage || stage.match_id !== matchId) {
-      res.status(404).json(fail('Stage not found in this match'));
-      return;
-    }
-
-    const attachments = db
-      .prepare(`SELECT storage_path FROM stage_attachments WHERE stage_id = ?`)
-      .all(stageId) as Array<{ storage_path: string }>;
-
-    for (const attachment of attachments) {
-      const absolutePath = resolveStoragePath(attachment.storage_path);
-      if (fs.existsSync(absolutePath)) {
-        fs.unlinkSync(absolutePath);
-      }
-    }
-
-    db.prepare(`DELETE FROM stage_attachments WHERE stage_id = ?`).run(stageId);
-    removeStageUploadsDir(stageId);
-    db.prepare(`DELETE FROM stages WHERE id = ?`).run(stageId);
-    res.json(ok({ id: stageId }));
-  } catch (err) {
-    res.status(500).json(fail(String(err)));
-  }
-});
-
 // PUT /stages/:id
 export function updateStage(req: Request, res: Response): void {
   const id = Number(req.params['id']);

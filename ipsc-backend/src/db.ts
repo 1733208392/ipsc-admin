@@ -2,6 +2,8 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import bcrypt from 'bcryptjs';
+import { DEFAULT_DIVISIONS, DEFAULT_SUB_DIVISIONS, DIVISION_POWER_FACTOR } from './constants.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, '..', 'data');
@@ -19,6 +21,55 @@ db.pragma('foreign_keys = ON');
 
 // Create all tables
 db.exec(`
+  CREATE TABLE IF NOT EXISTS clubs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    short_name TEXT NOT NULL,
+    contact_name TEXT,
+    contact_phone TEXT,
+    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','inactive')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'club_admin' CHECK(role IN ('super_admin','club_admin','shooter')),
+    club_id INTEGER REFERENCES clubs(id) ON DELETE SET NULL,
+    name TEXT NOT NULL,
+    phone TEXT,
+    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','inactive')),
+    last_login_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token_hash TEXT NOT NULL UNIQUE,
+    jti TEXT NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TEXT NOT NULL,
+    revoked INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    revoked_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS shooters_global (
+    uid TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    gender TEXT NOT NULL CHECK(gender IN ('male','female')),
+    age INTEGER,
+    region TEXT,
+    default_club_id INTEGER REFERENCES clubs(id) ON DELETE SET NULL,
+    id_card TEXT UNIQUE,
+    phone TEXT UNIQUE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS matches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -75,6 +126,7 @@ db.exec(`
     squad_id INTEGER REFERENCES squads(id),
     name TEXT NOT NULL,
     bib_number TEXT NOT NULL,
+    category_code TEXT CHECK(category_code IN ('J','S','SJ','L')),
     age INTEGER,
     gender TEXT,
     region TEXT,
@@ -143,6 +195,43 @@ db.exec(`
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+`);
+
+const clubCount = (db.prepare(`SELECT COUNT(*) AS c FROM clubs`).get() as { c: number }).c;
+if (clubCount === 0) {
+  db.prepare(
+    `INSERT INTO clubs (name, short_name, contact_name, contact_phone, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`
+  ).run('Default Club', 'DEFAULT', null, null);
+}
+
+const defaultClub = db
+  .prepare(`SELECT id FROM clubs WHERE status = 'active' ORDER BY id LIMIT 1`)
+  .get() as { id: number } | undefined;
+
+if (!defaultClub) {
+  throw new Error('No active club found for bootstrapping account system');
+}
+
+const matchColumns = db.prepare(`PRAGMA table_info(matches)`).all() as Array<{ name: string }>;
+if (!matchColumns.some((c) => c.name === 'club_id')) {
+  db.exec(`ALTER TABLE matches ADD COLUMN club_id INTEGER`);
+}
+db.prepare(`UPDATE matches SET club_id = ? WHERE club_id IS NULL`).run(defaultClub.id);
+
+const shooterBootstrapColumns = db.prepare(`PRAGMA table_info(shooters)`).all() as Array<{ name: string }>;
+if (!shooterBootstrapColumns.some((c) => c.name === 'shooter_uid')) {
+  db.exec(`ALTER TABLE shooters ADD COLUMN shooter_uid TEXT`);
+}
+if (!shooterBootstrapColumns.some((c) => c.name === 'club_id')) {
+  db.exec(`ALTER TABLE shooters ADD COLUMN club_id INTEGER`);
+}
+db.exec(`
+  UPDATE shooters
+  SET club_id = (
+    SELECT m.club_id FROM matches m WHERE m.id = shooters.match_id
+  )
+  WHERE club_id IS NULL
 `);
 
 // Divisions table migration (idempotent)
@@ -226,6 +315,11 @@ if (!existingShooterColumns.has('region')) {
 if (!existingShooterColumns.has('club')) {
   db.exec(`ALTER TABLE shooters ADD COLUMN club TEXT`);
 }
+if (!existingShooterColumns.has('category_code')) {
+  db.exec(`ALTER TABLE shooters ADD COLUMN category_code TEXT`);
+  db.exec(`UPDATE shooters SET category_code = UPPER(category_code) WHERE category_code IS NOT NULL`);
+  db.exec(`UPDATE shooters SET category_code = NULL WHERE category_code NOT IN ('J','S','SJ','L')`);
+}
 
 shooterColumns = getShooterColumns();
 const squadColumn = shooterColumns.find((c) => c.name === 'squad_id');
@@ -242,6 +336,7 @@ if (squadColumn && squadColumn.notnull === 1) {
         squad_id INTEGER REFERENCES squads(id),
         name TEXT NOT NULL,
         bib_number TEXT NOT NULL,
+        category_code TEXT CHECK(category_code IN ('J','S','SJ','L')),
         age INTEGER,
         gender TEXT,
         region TEXT,
@@ -250,8 +345,8 @@ if (squadColumn && squadColumn.notnull === 1) {
       )
     `);
     db.exec(`
-      INSERT INTO shooters_new (id, match_id, division_id, squad_id, name, bib_number, age, gender, region, club, created_at)
-      SELECT id, match_id, division_id, squad_id, name, bib_number, age, gender, region, club, COALESCE(created_at, datetime('now'))
+      INSERT INTO shooters_new (id, match_id, division_id, squad_id, name, bib_number, category_code, age, gender, region, club, created_at)
+      SELECT id, match_id, division_id, squad_id, name, bib_number, category_code, age, gender, region, club, COALESCE(created_at, datetime('now'))
       FROM shooters
     `);
     db.exec(`DROP TABLE shooters`);
@@ -267,6 +362,25 @@ if (squadColumn && squadColumn.notnull === 1) {
 
 shooterColumns = getShooterColumns();
 existingShooterColumns = new Set(shooterColumns.map((c) => c.name));
+
+if (!existingShooterColumns.has('shooter_uid')) {
+  db.exec(`ALTER TABLE shooters ADD COLUMN shooter_uid TEXT`);
+}
+if (!existingShooterColumns.has('club_id')) {
+  db.exec(`ALTER TABLE shooters ADD COLUMN club_id INTEGER`);
+}
+if (!existingShooterColumns.has('category_code')) {
+  db.exec(`ALTER TABLE shooters ADD COLUMN category_code TEXT`);
+  db.exec(`UPDATE shooters SET category_code = UPPER(category_code) WHERE category_code IS NOT NULL`);
+  db.exec(`UPDATE shooters SET category_code = NULL WHERE category_code NOT IN ('J','S','SJ','L')`);
+}
+db.exec(`
+  UPDATE shooters
+  SET club_id = (
+    SELECT m.club_id FROM matches m WHERE m.id = shooters.match_id
+  )
+  WHERE club_id IS NULL
+`);
 
 // Scores table migration: ensure shooter_id has ON DELETE CASCADE
 const scoresColumns = db.prepare(`PRAGMA table_info(scores)`).all() as Array<{ name: string }>;
@@ -359,9 +473,6 @@ try {
   // If migration fails, continue - the table may have correct constraints already
 }
 
-// Migration: Ensure all matches have 5 default divisions
-import { DEFAULT_DIVISIONS, DIVISION_POWER_FACTOR } from './constants.js';
-
 try {
   const matches = db.prepare(`SELECT id FROM matches`).all() as Array<{ id: number }>;
   const insertDivision = db.prepare(
@@ -388,9 +499,6 @@ try {
   // If migration fails, continue
 }
 
-// Migration: Ensure all matches have default sub-divisions
-import { DEFAULT_SUB_DIVISIONS } from './constants.js';
-
 try {
   const matches = db.prepare(`SELECT id FROM matches`).all() as Array<{ id: number }>;
   const insertSubDivision = db.prepare(
@@ -414,6 +522,41 @@ try {
   }
 } catch {
   // If migration fails, continue
+}
+
+try {
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_matches_club_id ON matches(club_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_shooters_club_id ON shooters(club_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_shooters_shooter_uid ON shooters(shooter_uid)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_users_club_id ON users(club_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_shooters_global_name ON shooters_global(name)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at)`);
+} catch {
+  // Keep startup resilient for legacy DB oddities.
+}
+
+try {
+  db.exec(`DELETE FROM refresh_tokens WHERE revoked = 1 OR datetime(expires_at) <= datetime('now')`);
+} catch {
+  // Skip cleanup on malformed legacy rows.
+}
+
+const usersCount = (db.prepare(`SELECT COUNT(*) AS c FROM users`).get() as { c: number }).c;
+if (usersCount === 0) {
+  const defaultAdminPassword = process.env['DEFAULT_ADMIN_PASSWORD'] || 'admin123456';
+  const defaultClubPassword = process.env['DEFAULT_CLUB_ADMIN_PASSWORD'] || 'club123456';
+
+  db.prepare(
+    `INSERT INTO users (username, password_hash, role, club_id, name, status, created_at, updated_at)
+     VALUES (?, ?, 'super_admin', NULL, ?, 'active', datetime('now'), datetime('now'))`
+  ).run('superadmin', bcrypt.hashSync(defaultAdminPassword, 10), 'Platform Super Admin');
+
+  db.prepare(
+    `INSERT INTO users (username, password_hash, role, club_id, name, status, created_at, updated_at)
+     VALUES (?, ?, 'club_admin', ?, ?, 'active', datetime('now'), datetime('now'))`
+  ).run('clubadmin', bcrypt.hashSync(defaultClubPassword, 10), defaultClub.id, 'Default Club Admin');
 }
 
 export default db;

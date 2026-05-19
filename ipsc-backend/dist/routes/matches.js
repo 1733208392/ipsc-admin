@@ -10,10 +10,26 @@ router.post('/', (req, res) => {
         res.status(400).json(fail(parsed.error.message));
         return;
     }
-    const { name, date, status } = parsed.data;
+    const { name, date, status, club_id } = parsed.data;
+    if (!req.user) {
+        res.status(401).json(fail('未登录'));
+        return;
+    }
+    const resolvedClubId = req.user.role === 'super_admin'
+        ? (club_id ?? req.user.club_id)
+        : req.user.club_id;
+    if (!resolvedClubId) {
+        res.status(400).json(fail('无法确定赛事所属俱乐部'));
+        return;
+    }
+    const club = db.prepare(`SELECT id FROM clubs WHERE id = ?`).get(resolvedClubId);
+    if (!club) {
+        res.status(400).json(fail('俱乐部不存在'));
+        return;
+    }
     try {
-        const stmt = db.prepare(`INSERT INTO matches (name, date, status) VALUES (?, ?, ?)`);
-        const result = stmt.run(name, date, status);
+        const stmt = db.prepare(`INSERT INTO matches (name, date, status, club_id) VALUES (?, ?, ?, ?)`);
+        const result = stmt.run(name, date, status, resolvedClubId);
         const insertDivision = db.prepare(`INSERT INTO divisions (match_id, code, name, sort_order) VALUES (?, ?, ?, ?)`);
         const insertDivisionLegacy = db.prepare(`INSERT INTO divisions (match_id, code, name, power_factor, sort_order) VALUES (?, ?, ?, ?, ?)`);
         for (const division of DEFAULT_DIVISIONS) {
@@ -37,17 +53,21 @@ router.post('/', (req, res) => {
     }
 });
 // GET /matches
-router.get('/', (_req, res) => {
+router.get('/', (req, res) => {
+    if (!req.user) {
+        res.status(401).json(fail('未登录'));
+        return;
+    }
     try {
-        const matches = db
-            .prepare(`SELECT
-           m.*,
-           (SELECT COUNT(*) FROM divisions d WHERE d.match_id = m.id) AS divisions_count,
-           (SELECT COUNT(*) FROM stages st WHERE st.match_id = m.id) AS stages_count,
-           (SELECT COUNT(*) FROM squads sq WHERE sq.match_id = m.id) AS squads_count
-         FROM matches m
-         ORDER BY m.created_at DESC`)
-            .all();
+        const baseSql = `SELECT
+        m.*,
+        (SELECT COUNT(*) FROM divisions d WHERE d.match_id = m.id) AS divisions_count,
+        (SELECT COUNT(*) FROM stages st WHERE st.match_id = m.id) AS stages_count,
+        (SELECT COUNT(*) FROM squads sq WHERE sq.match_id = m.id) AS squads_count
+      FROM matches m`;
+        const matches = req.user.role === 'super_admin'
+            ? db.prepare(`${baseSql} ORDER BY m.created_at DESC`).all()
+            : db.prepare(`${baseSql} WHERE m.club_id = ? ORDER BY m.created_at DESC`).all(req.user.club_id);
         res.json(ok(matches));
     }
     catch (err) {

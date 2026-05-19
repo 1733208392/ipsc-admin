@@ -23,6 +23,7 @@ interface StageScoreRow {
 }
 
 export interface CategoryFilter {
+  categoryCode?: 'J' | 'S' | 'SJ' | 'L';
   gender?: string;
   minAge?: number;
   maxAge?: number;
@@ -87,15 +88,27 @@ function getShooterBaseList(matchId: number, divisionId: number | null, category
     params.push(divisionId);
   }
 
-  if (categoryFilter?.gender) {
+  if (categoryFilter?.categoryCode) {
+    if (categoryFilter.categoryCode === 'L') {
+      sql += ` AND (s.category_code = 'L' OR (s.category_code IS NULL AND s.gender = 'female'))`;
+    } else if (categoryFilter.categoryCode === 'J') {
+      sql += ` AND (s.category_code = 'J' OR (s.category_code IS NULL AND s.age IS NOT NULL AND s.age < 21))`;
+    } else if (categoryFilter.categoryCode === 'S') {
+      sql += ` AND (s.category_code = 'S' OR (s.category_code IS NULL AND s.age IS NOT NULL AND s.age >= 55))`;
+    } else if (categoryFilter.categoryCode === 'SJ') {
+      sql += ` AND (s.category_code = 'SJ' OR (s.category_code IS NULL AND s.age IS NOT NULL AND s.age >= 65))`;
+    }
+  }
+
+  if (!categoryFilter?.categoryCode && categoryFilter?.gender) {
     sql += ` AND s.gender = ?`;
     params.push(categoryFilter.gender);
   }
-  if (categoryFilter?.minAge !== undefined) {
+  if (!categoryFilter?.categoryCode && categoryFilter?.minAge !== undefined) {
     sql += ` AND s.age IS NOT NULL AND s.age >= ?`;
     params.push(categoryFilter.minAge);
   }
-  if (categoryFilter?.maxAge !== undefined) {
+  if (!categoryFilter?.categoryCode && categoryFilter?.maxAge !== undefined) {
     sql += ` AND s.age IS NOT NULL AND s.age < ?`;
     params.push(categoryFilter.maxAge);
   }

@@ -4,6 +4,7 @@ export const CreateMatchSchema = z.object({
     name: z.string().min(1),
     date: z.string().min(1),
     status: z.enum(['draft', 'active', 'completed']).optional().default('draft'),
+    club_id: z.number().int().positive().optional(),
 });
 export const UpdateMatchSchema = z.object({
     name: z.string().min(1).optional(),
@@ -66,12 +67,15 @@ export const UpdateSquadSchema = z.object({
     name: z.string().min(1).optional(),
     sort_order: z.number().int().optional(),
 });
+export const VALID_SHOOTER_CATEGORY_CODES = ['J', 'S', 'SJ', 'L'];
 // ── Shooters ──────────────────────────────────────────────────────────────────
 export const CreateShooterSchema = z.object({
     division_id: z.number().int().positive(),
     squad_id: z.number().int().positive().optional(),
-    name: z.string().min(1),
+    shooter_uid: z.string().min(1).optional(),
+    name: z.string().min(1).optional(),
     bib_number: z.string().min(1),
+    category_code: z.enum(VALID_SHOOTER_CATEGORY_CODES).optional(),
     age: z.number().int().min(0).max(120).optional(),
     gender: z.enum(['male', 'female']).optional(),
     region: z.string().max(50).optional(),
@@ -80,12 +84,64 @@ export const CreateShooterSchema = z.object({
 export const UpdateShooterSchema = z.object({
     division_id: z.number().int().positive().optional(),
     squad_id: z.number().int().positive().optional(),
+    shooter_uid: z.string().min(1).optional(),
     name: z.string().min(1).optional(),
     bib_number: z.string().min(1).optional(),
+    category_code: z.enum(VALID_SHOOTER_CATEGORY_CODES).optional(),
     age: z.number().int().min(0).max(120).optional(),
     gender: z.enum(['male', 'female']).optional(),
     region: z.string().max(50).optional(),
     club: z.string().max(100).optional(),
+});
+// ── Auth / Accounts ──────────────────────────────────────────────────────────
+export const CreateClubSchema = z.object({
+    name: z.string().min(1),
+    short_name: z.string().min(1),
+    contact_name: z.string().optional(),
+    contact_phone: z.string().optional(),
+    status: z.enum(['active', 'inactive']).optional().default('active'),
+});
+export const UpdateClubSchema = z.object({
+    name: z.string().min(1).optional(),
+    short_name: z.string().min(1).optional(),
+    contact_name: z.string().nullable().optional(),
+    contact_phone: z.string().nullable().optional(),
+    status: z.enum(['active', 'inactive']).optional(),
+});
+export const CreateUserSchema = z.object({
+    username: z.string().min(3),
+    password: z.string().min(6),
+    role: z.enum(['super_admin', 'club_admin', 'shooter']),
+    club_id: z.number().int().positive().optional(),
+    name: z.string().min(1),
+    phone: z.string().optional(),
+    status: z.enum(['active', 'inactive']).optional().default('active'),
+});
+export const UpdateUserSchema = z.object({
+    password: z.string().min(6).optional(),
+    role: z.enum(['super_admin', 'club_admin', 'shooter']).optional(),
+    club_id: z.number().int().positive().nullable().optional(),
+    name: z.string().min(1).optional(),
+    phone: z.string().nullable().optional(),
+    status: z.enum(['active', 'inactive']).optional(),
+});
+export const CreateGlobalShooterSchema = z.object({
+    name: z.string().min(1),
+    gender: z.enum(['male', 'female']),
+    age: z.number().int().min(0).max(120).optional(),
+    region: z.string().max(100).optional(),
+    default_club_id: z.number().int().positive().optional(),
+    id_card: z.string().max(50).optional(),
+    phone: z.string().max(30).optional(),
+});
+export const UpdateGlobalShooterSchema = z.object({
+    name: z.string().min(1).optional(),
+    gender: z.enum(['male', 'female']).optional(),
+    age: z.number().int().min(0).max(120).optional(),
+    region: z.string().max(100).optional(),
+    default_club_id: z.number().int().positive().nullable().optional(),
+    id_card: z.string().max(50).nullable().optional(),
+    phone: z.string().max(30).nullable().optional(),
 });
 export const ChangeSquadSchema = z.object({
     squad_id: z.number().int().positive(),

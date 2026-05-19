@@ -130,22 +130,9 @@ function aggregateFromRows(rows) {
 }
 function normalizeRows(rows) {
     return rows.map((row) => {
-        const cappedNs = Math.min(row.ns_hits, 2);
-        if (row.row_type !== 'steel') {
-            // Paper target: M is always auto-derived from scoring hits
-            const scoring = row.a_hits + row.c_hits + row.d_hits;
-            return {
-                ...row,
-                ns_hits: cappedNs,
-                m_hits: Math.max(0, 2 - scoring),
-            };
-        }
         return {
             ...row,
-            ns_hits: cappedNs,
-            c_hits: 0,
-            d_hits: 0,
-            npm_hits: 0,
+            ns_hits: Math.min(row.ns_hits, 2),
         };
     });
 }
@@ -213,7 +200,7 @@ router.post('/flextarget', (req, res) => {
         res.status(400).json(fail(parsed.error.message));
         return;
     }
-    const { shooter_bib, stage_id, total_time, hits, penalties, first_shot, fastest_split } = parsed.data;
+    const { shooter_bib, stage_id, total_time, hits, rows: perTargetRows, penalties, first_shot, fastest_split } = parsed.data;
     try {
         // 1. Find shooter by bib number in this match
         const shooter = db
@@ -254,17 +241,42 @@ router.post('/flextarget', (req, res) => {
             res.status(400).json(fail(`Unsupported division code: ${division.code}`));
             return;
         }
-        const cappedNHits = capNsByTarget(hits.N, stage.targets_count);
+        const computedHits = perTargetRows && perTargetRows.length > 0
+            ? perTargetRows.reduce((acc, row) => ({
+                A: acc.A + row.A,
+                C: acc.C + row.C,
+                D: acc.D + row.D,
+                M: acc.M + row.M,
+                N: acc.N + row.N,
+            }), { A: 0, C: 0, D: 0, M: 0, N: 0 })
+            : {
+                A: hits?.A ?? 0,
+                C: hits?.C ?? 0,
+                D: hits?.D ?? 0,
+                M: hits?.M ?? 0,
+                N: hits?.N ?? 0,
+            };
+        const cappedNHits = capNsByTarget(computedHits.N, stage.targets_count);
         // 4. Calculate score
         const { totalPoints, hitFactor } = calculateScore({
             ...hits,
+            ...computedHits,
             N: cappedNHits,
         }, penalties, total_time, powerFactor, 'normal');
         // 5. Insert new score submission
-        db.prepare(`INSERT INTO scores
+        const insertScoreResult = db.prepare(`INSERT INTO scores
         (match_id, shooter_id, stage_id, total_time, a_hits, c_hits, d_hits, m_hits, n_hits, pe,
          first_shot, fastest_split, status, review_state, review_submitted_at, total_points, hit_factor, updated_at, submitted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'normal', 'submitted', datetime('now'), ?, ?, datetime('now'), datetime('now'))`).run(matchId, shooter.id, stage.id, total_time, hits.A, hits.C, hits.D, hits.M, cappedNHits, penalties.PE, first_shot ?? null, fastest_split ?? null, totalPoints, hitFactor);
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'normal', 'submitted', datetime('now'), ?, ?, datetime('now'), datetime('now'))`).run(matchId, shooter.id, stage.id, total_time, computedHits.A, computedHits.C, computedHits.D, computedHits.M, cappedNHits, penalties.PE, first_shot ?? null, fastest_split ?? null, totalPoints, hitFactor);
+        if (perTargetRows && perTargetRows.length > 0) {
+            const scoreId = Number(insertScoreResult.lastInsertRowid);
+            const insertRow = db.prepare(`INSERT INTO score_card_rows
+         (score_id, row_type, row_no, a_hits, c_hits, d_hits, m_hits, ns_hits, npm_hits)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+            for (const row of perTargetRows) {
+                insertRow.run(scoreId, row.row_type, row.row_no, row.A, row.C, row.D, row.M, Math.min(row.N, 2), 0);
+            }
+        }
         // Return all scores for this shooter and stage, ordered by submitted_at desc
         const scores = db
             .prepare(`SELECT * FROM scores WHERE shooter_id = ? AND stage_id = ? ORDER BY submitted_at DESC, id DESC`)

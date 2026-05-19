@@ -29,7 +29,7 @@ const rowFields = [
   { key: 'c_hits',  label: 'C',  headerClass: 'bg-sky-500/15',    valueClass: 'text-sky-600'    },
   { key: 'd_hits',  label: 'D',  headerClass: 'bg-yellow-500/15', valueClass: 'text-yellow-600' },
   { key: 'm_hits',  label: 'M',  headerClass: 'bg-red-500/15',    valueClass: 'text-red-600'    },
-  { key: 'ns_hits', label: 'NS', headerClass: 'bg-orange-500/15', valueClass: 'text-orange-600' },
+  { key: 'ns_hits', label: 'N', headerClass: 'bg-orange-500/15', valueClass: 'text-orange-600' },
 ] as const
 
 type RowField = (typeof rowFields)[number]['key']
@@ -37,11 +37,9 @@ type RowField = (typeof rowFields)[number]['key']
 type ScoreStatus = 'normal' | 'dnf' | 'dq'
 
 function canEditField(rowType: 'paper' | 'steel', field: RowField): boolean {
-  if (rowType === 'steel') {
-    return field === 'a_hits' || field === 'm_hits' || field === 'ns_hits'
-  }
-  // Paper: M is auto-derived from scoring hits — not manually editable
-  return field !== 'm_hits'
+  void rowType
+  void field
+  return true
 }
 
 export function ScoreCardPage() {
@@ -174,16 +172,7 @@ export function ScoreCardPage() {
       if (!current) return prev
       if (!canEditField(current.row_type, field)) return prev
       const nextValue = Math.max(0, current[field] + delta)
-      let updated = { ...current, [field]: nextValue }
-      // Paper target: auto-derive M = max(0, 2 - scoring hits)
-      if (
-        current.row_type === 'paper' &&
-        (field === 'a_hits' || field === 'c_hits' || field === 'd_hits')
-      ) {
-        const scoring = updated.a_hits + updated.c_hits + updated.d_hits
-        updated = { ...updated, m_hits: Math.max(0, 2 - scoring) }
-      }
-      next[rowIndex] = updated
+      next[rowIndex] = { ...current, [field]: nextValue }
       return next
     })
   }
@@ -377,7 +366,7 @@ export function ScoreCardPage() {
                     <div className="text-[10px] font-normal text-muted-foreground leading-tight">max 2/tgt</div>
                   )}
                   {field.key === 'm_hits' && (
-                    <div className="text-[10px] font-normal text-muted-foreground leading-tight">paper: auto</div>
+                    <div className="text-[10px] font-normal text-muted-foreground leading-tight">manual</div>
                   )}
                 </th>
               ))}

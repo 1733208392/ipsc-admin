@@ -186,6 +186,16 @@ export const AddShooterToSquadSchema = z.object({
 });
 
 // ── Scores / FlexTarget ───────────────────────────────────────────────────────
+export const FlexTargetPerTargetRowSchema = z.object({
+  row_type: z.enum(['paper', 'steel']),
+  row_no: z.number().int().positive(),
+  A: z.number().int().min(0),
+  C: z.number().int().min(0),
+  D: z.number().int().min(0),
+  M: z.number().int().min(0),
+  N: z.number().int().min(0),
+});
+
 export const FlexTargetSchema = z.object({
   shooter_bib: z.string().min(1),
   stage_id: z.union([z.string().min(1), z.number()]),
@@ -196,12 +206,21 @@ export const FlexTargetSchema = z.object({
     D: z.number().int().min(0),
     M: z.number().int().min(0),
     N: z.number().int().min(0),
-  }),
+  }).optional(),
+  rows: z.array(FlexTargetPerTargetRowSchema).min(1).optional(),
   penalties: z.object({
     PE: z.number().int().min(0),
   }),
   first_shot: z.number().optional(),
   fastest_split: z.number().optional(),
+}).superRefine((data, ctx) => {
+  if (!data.hits && (!data.rows || data.rows.length === 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Either hits or rows is required',
+      path: ['hits'],
+    });
+  }
 });
 
 export const ScoreStatusSchema = z.enum(['normal', 'dnf', 'dq']);

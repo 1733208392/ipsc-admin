@@ -111,8 +111,14 @@ Content-Type: application/json
   "shooter_bib": "42",
   "stage_id": "1",
   "total_time": 12.35,
+  "rows": [
+    { "row_type": "steel", "row_no": 1, "A": 1, "C": 0, "D": 0, "M": 0, "N": 0 },
+    { "row_type": "steel", "row_no": 2, "A": 0, "C": 1, "D": 0, "M": 0, "N": 0 },
+    { "row_type": "paper", "row_no": 1, "A": 2, "C": 0, "D": 0, "M": 0, "N": 0 },
+    { "row_type": "paper", "row_no": 2, "A": 1, "C": 1, "D": 0, "M": 0, "N": 0 }
+  ],
   "hits": {
-    "A": 8,
+    "A": 4,
     "C": 2,
     "D": 0,
     "M": 0,
@@ -133,14 +139,16 @@ Content-Type: application/json
 | `shooter_bib` | string | ✅ | 射手 bib 号，后端用此匹配射手 |
 | `stage_id` | string/number | ✅ | Stage ID，必须是该赛事下的 Stage |
 | `total_time` | number | ✅ | 总耗时（秒），精确到 0.01 |
-| `hits.A` | number | ✅ | A 区命中数 |
-| `hits.C` | number | ✅ | C 区命中数 |
-| `hits.D` | number | ✅ | D 区命中数 |
-| `hits.M` | number | ✅ | Miss 数 |
-| `hits.N` | number | ✅ | No-shoot 命中数（打中人质靶） |
+| `rows` | array | ❌ | 按目标上传命中明细（推荐）。支持 `paper` 与 `steel` |
+| `rows[].row_type` | string | rows模式必填 | `paper` / `steel` |
+| `rows[].row_no` | number | rows模式必填 | 目标序号（从 1 开始） |
+| `rows[].A/C/D/M/N` | number | rows模式必填 | 该目标的 A/C/D/M/N 数值；钢靶同样支持 A/C/D/M/N |
+| `hits.A/C/D/M/N` | number | ❌ | 聚合命中数。未传 `rows` 时必填 |
 | `penalties.PE` | number | ✅ | 程序性犯规扣分 |
 | `first_shot` | number | ❌ | 首发射击时间（秒），可选 |
 | `fastest_split` | number | ❌ | 最快连发间隔（秒），可选 |
+
+> `rows` 与 `hits` 二选一即可；如果同时传，后端以 `rows` 自动汇总结果为准。
 
 ### Response `200`
 

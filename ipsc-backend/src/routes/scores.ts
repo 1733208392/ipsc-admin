@@ -37,6 +37,12 @@ interface ScoreRow {
   id: number;
   shooter_id: number;
   stage_id: number;
+  a_hits: number;
+  c_hits: number;
+  d_hits: number;
+  m_hits: number;
+  n_hits: number;
+  pe: number;
   total_time: number;
   first_shot: number | null;
   fastest_split: number | null;
@@ -46,6 +52,7 @@ interface ScoreRow {
   total_points: number;
   hit_factor: number;
   confirmed: number;
+  submitted_at?: string;
 }
 
 interface ScoreCardRow {
@@ -110,6 +117,77 @@ function buildDefaultRows(stage: Stage): ScoreCardRow[] {
   return [...steelRows, ...paperRows];
 }
 
+function buildEmptyRows(stage: Stage): ScoreCardRow[] {
+  const steelRows: ScoreCardRow[] = Array.from({ length: stage.poppers_plates_count }).map((_, idx) => ({
+    row_type: 'steel',
+    row_no: idx + 1,
+    a_hits: 0,
+    c_hits: 0,
+    d_hits: 0,
+    m_hits: 0,
+    ns_hits: 0,
+    npm_hits: 0,
+  }));
+  const paperRows: ScoreCardRow[] = Array.from({ length: stage.targets_count }).map((_, idx) => ({
+    row_type: 'paper',
+    row_no: idx + 1,
+    a_hits: 0,
+    c_hits: 0,
+    d_hits: 0,
+    m_hits: 0,
+    ns_hits: 0,
+    npm_hits: 0,
+  }));
+  return [...steelRows, ...paperRows];
+}
+
+function distribute(total: number, slots: number, capPerSlot?: number): number[] {
+  if (slots <= 0 || total <= 0) return Array.from({ length: Math.max(slots, 0) }, () => 0);
+  const out = Array.from({ length: slots }, () => 0);
+  let remaining = total;
+  let idx = 0;
+  while (remaining > 0) {
+    if (capPerSlot !== undefined && out[idx] >= capPerSlot) {
+      idx = (idx + 1) % slots;
+      const allCapped = out.every((v) => v >= capPerSlot);
+      if (allCapped) break;
+      continue;
+    }
+    out[idx] += 1;
+    remaining -= 1;
+    idx = (idx + 1) % slots;
+  }
+  return out;
+}
+
+function buildRowsFromScore(stage: Stage, score: ScoreRow): ScoreCardRow[] {
+  const rows = buildEmptyRows(stage);
+  const paperIndexes = rows
+    .map((row, idx) => ({ row, idx }))
+    .filter((item) => item.row.row_type === 'paper')
+    .map((item) => item.idx);
+
+  const targetIndexes = paperIndexes.length > 0
+    ? paperIndexes
+    : rows.map((_, idx) => idx);
+
+  const aDist = distribute(Math.max(0, score.a_hits), targetIndexes.length);
+  const cDist = distribute(Math.max(0, score.c_hits), targetIndexes.length);
+  const dDist = distribute(Math.max(0, score.d_hits), targetIndexes.length);
+  const mDist = distribute(Math.max(0, score.m_hits), targetIndexes.length);
+  const nsDist = distribute(Math.max(0, score.n_hits), targetIndexes.length, 2);
+
+  targetIndexes.forEach((targetIdx, i) => {
+    rows[targetIdx].a_hits = aDist[i] ?? 0;
+    rows[targetIdx].c_hits = cDist[i] ?? 0;
+    rows[targetIdx].d_hits = dDist[i] ?? 0;
+    rows[targetIdx].m_hits = mDist[i] ?? 0;
+    rows[targetIdx].ns_hits = nsDist[i] ?? 0;
+  });
+
+  return rows;
+}
+
 function aggregateFromRows(rows: ScoreCardRowInput[]) {
   let a = 0;
   let c = 0;
@@ -166,7 +244,7 @@ function countAutoUnengagedPE(rows: ScoreCardRowInput[]): number {
   ).length;
 }
 
-function getScoreCardPayload(matchId: number, shooterId: number, stageId: number) {
+function getScoreCardPayload(matchId: number, shooterId: number, stageId: number, scoreId?: number) {
   const shooter = db
     .prepare(`SELECT id, match_id, division_id, name, bib_number FROM shooters WHERE match_id = ? AND id = ?`)
     .get(matchId, shooterId) as (Shooter & { name: string; bib_number: string }) | undefined;
@@ -175,9 +253,17 @@ function getScoreCardPayload(matchId: number, shooterId: number, stageId: number
   const stage = getStage(matchId, stageId);
   if (!stage) return null;
 
-  const score = db
-    .prepare(`SELECT * FROM scores WHERE shooter_id = ? AND stage_id = ?`)
-    .get(shooterId, stageId) as ScoreRow | undefined;
+  const scores = db
+    .prepare(`SELECT * FROM scores WHERE shooter_id = ? AND stage_id = ? ORDER BY submitted_at DESC, id DESC`)
+    .all(shooterId, stageId) as ScoreRow[];
+
+  const score = scoreId
+    ? scores.find((item) => item.id === scoreId) ?? null
+    : (scores[0] ?? null);
+
+  if (scoreId && !score) {
+    return null;
+  }
 
   const rows = score
     ? (db
@@ -204,8 +290,13 @@ function getScoreCardPayload(matchId: number, shooterId: number, stageId: number
   return {
     shooter,
     stage,
+    scores,
     score: score ?? null,
-    rows: rows.length > 0 ? rows : buildDefaultRows(stage),
+    rows: rows.length > 0
+      ? rows
+      : score
+        ? buildRowsFromScore(stage, score)
+        : buildDefaultRows(stage),
     penalty_reasons: penalties,
   };
 }
@@ -279,29 +370,12 @@ router.post('/flextarget', (req: Request, res: Response) => {
       'normal'
     );
 
-    // 5. UPSERT into scores
+    // 5. Insert new score submission
     db.prepare(
       `INSERT INTO scores
         (match_id, shooter_id, stage_id, total_time, a_hits, c_hits, d_hits, m_hits, n_hits, pe,
-         first_shot, fastest_split, status, review_state, review_submitted_at, total_points, hit_factor, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'normal', 'submitted', datetime('now'), ?, ?, datetime('now'))
-       ON CONFLICT(shooter_id, stage_id) DO UPDATE SET
-         total_time = excluded.total_time,
-         a_hits = excluded.a_hits,
-         c_hits = excluded.c_hits,
-         d_hits = excluded.d_hits,
-         m_hits = excluded.m_hits,
-         n_hits = excluded.n_hits,
-         pe = excluded.pe,
-         first_shot = excluded.first_shot,
-         fastest_split = excluded.fastest_split,
-         status = excluded.status,
-         review_state = excluded.review_state,
-         review_submitted_at = excluded.review_submitted_at,
-         total_points = excluded.total_points,
-         hit_factor = excluded.hit_factor,
-         confirmed = 0,
-         updated_at = datetime('now')`
+         first_shot, fastest_split, status, review_state, review_submitted_at, total_points, hit_factor, updated_at, submitted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'normal', 'submitted', datetime('now'), ?, ?, datetime('now'), datetime('now'))`
     ).run(
       matchId,
       shooter.id,
@@ -319,11 +393,45 @@ router.post('/flextarget', (req: Request, res: Response) => {
       hitFactor
     );
 
-    const score = db
-      .prepare(`SELECT * FROM scores WHERE shooter_id = ? AND stage_id = ?`)
-      .get(shooter.id, stage.id);
+    // Return all scores for this shooter and stage, ordered by submitted_at desc
+    const scores = db
+      .prepare(`SELECT * FROM scores WHERE shooter_id = ? AND stage_id = ? ORDER BY submitted_at DESC, id DESC`)
+      .all(shooter.id, stage.id);
 
-    res.status(200).json(ok({ score, totalPoints, hitFactor }));
+    res.status(200).json(ok({ scores, totalPoints, hitFactor }));
+  } catch (err) {
+    res.status(500).json(fail(String(err)));
+  }
+});
+
+// GET /matches/:matchId/scores
+router.get('/', (req: Request, res: Response) => {
+  const matchId = Number(req.params['matchId']);
+  try {
+    const match = db.prepare(`SELECT id FROM matches WHERE id = ?`).get(matchId);
+    if (!match) {
+      res.status(404).json(fail('Match not found'));
+      return;
+    }
+
+    const scores = db
+      .prepare(
+        `SELECT
+           sc.*,
+           sh.name AS shooter_name,
+           sh.bib_number,
+           st.name AS stage_name,
+           d.name AS division_name
+         FROM scores sc
+         JOIN shooters sh ON sc.shooter_id = sh.id
+         JOIN stages st ON sc.stage_id = st.id
+         JOIN divisions d ON sh.division_id = d.id
+         WHERE sc.match_id = ?
+         ORDER BY sc.submitted_at DESC, sc.id DESC`
+      )
+      .all(matchId);
+
+    res.json(ok(scores));
   } catch (err) {
     res.status(500).json(fail(String(err)));
   }
@@ -334,14 +442,20 @@ router.get('/score-card', (req: Request, res: Response) => {
   const matchId = Number(req.params['matchId']);
   const shooterId = Number(req.query['shooter_id']);
   const stageId = Number(req.query['stage_id']);
+  const scoreIdQuery = req.query['score_id'];
+  const scoreId = scoreIdQuery ? Number(scoreIdQuery) : undefined;
 
   if (!Number.isInteger(shooterId) || shooterId <= 0 || !Number.isInteger(stageId) || stageId <= 0) {
     res.status(400).json(fail('shooter_id and stage_id are required positive integers'));
     return;
   }
+  if (scoreIdQuery !== undefined && (!Number.isInteger(scoreId) || (scoreId as number) <= 0)) {
+    res.status(400).json(fail('score_id must be a positive integer when provided'));
+    return;
+  }
 
   try {
-    const payload = getScoreCardPayload(matchId, shooterId, stageId);
+    const payload = getScoreCardPayload(matchId, shooterId, stageId, scoreId);
     if (!payload) {
       res.status(404).json(fail('Shooter or stage not found in this match'));
       return;
@@ -529,45 +643,20 @@ router.post('/score-card/submit', (req: Request, res: Response) => {
        WHERE id = ?`
     ).run(score.id);
 
+    // Return updated payload (all scores for this shooter/stage)
     const payload = getScoreCardPayload(matchId, shooter_id, stage_id);
     res.json(ok(payload));
   } catch (err) {
     res.status(500).json(fail(String(err)));
   }
 });
-
-// GET /matches/:matchId/scores
-router.get('/', (req: Request, res: Response) => {
-  const matchId = Number(req.params['matchId']);
-  try {
-    const scores = db
-      .prepare(
-        `SELECT sc.*,
-                sh.name AS shooter_name, sh.bib_number,
-                st.name AS stage_name,
-                d.name AS division_name
-         FROM scores sc
-         JOIN shooters sh ON sc.shooter_id = sh.id
-         JOIN stages st ON sc.stage_id = st.id
-         JOIN divisions d ON sh.division_id = d.id
-         WHERE sc.match_id = ?
-         ORDER BY st.sort_order, sh.bib_number`
-      )
-      .all(matchId);
-    res.json(ok(scores));
-  } catch (err) {
-    res.status(500).json(fail(String(err)));
-  }
-});
-
 // GET /shooters/:shooterId/scores  (mounted separately)
 export function getShooterScores(req: Request, res: Response): void {
   const shooterId = Number(req.params['shooterId']);
   try {
     const scores = db
       .prepare(
-        `SELECT sc.*,
-                st.name AS stage_name, st.sort_order AS stage_sort_order
+        `SELECT sc.*, st.name AS stage_name, st.sort_order AS stage_sort_order
          FROM scores sc
          JOIN stages st ON sc.stage_id = st.id
          WHERE sc.shooter_id = ?
@@ -575,45 +664,6 @@ export function getShooterScores(req: Request, res: Response): void {
       )
       .all(shooterId);
     res.json(ok(scores));
-  } catch (err) {
-    res.status(500).json(fail(String(err)));
-  }
-}
-
-// PUT /scores/:id/confirm  (mounted separately)
-export function confirmScore(req: Request, res: Response): void {
-  const id = Number(req.params['id']);
-  try {
-    const score = db.prepare(`SELECT * FROM scores WHERE id = ?`).get(id);
-    if (!score) {
-      res.status(404).json(fail('Score not found'));
-      return;
-    }
-    db.prepare(`UPDATE scores SET confirmed = 1, updated_at = datetime('now') WHERE id = ?`).run(id);
-    const updated = db.prepare(`SELECT * FROM scores WHERE id = ?`).get(id);
-    res.json(ok(updated));
-  } catch (err) {
-    res.status(500).json(fail(String(err)));
-  }
-}
-
-// DELETE /scores/:id  (mounted separately)
-export function deleteScore(req: Request, res: Response): void {
-  const id = Number(req.params['id']);
-  try {
-    const score = db.prepare(`SELECT * FROM scores WHERE id = ?`).get(id) as
-      | { confirmed: number }
-      | undefined;
-    if (!score) {
-      res.status(404).json(fail('Score not found'));
-      return;
-    }
-    if (score.confirmed === 1) {
-      res.status(409).json(fail('Cannot delete a confirmed score'));
-      return;
-    }
-    db.prepare(`DELETE FROM scores WHERE id = ?`).run(id);
-    res.json(ok({ id }));
   } catch (err) {
     res.status(500).json(fail(String(err)));
   }

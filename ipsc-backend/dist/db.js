@@ -99,7 +99,7 @@ db.exec(`
     confirmed INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    UNIQUE(shooter_id, stage_id)
+    submitted_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS score_card_rows (
@@ -255,14 +255,26 @@ if (!existingScoresColumns.has('review_state')) {
 if (!existingScoresColumns.has('review_submitted_at')) {
     db.exec(`ALTER TABLE scores ADD COLUMN review_submitted_at TEXT`);
 }
+if (!existingScoresColumns.has('submitted_at')) {
+    db.exec(`ALTER TABLE scores ADD COLUMN submitted_at TEXT`);
+    db.exec(`UPDATE scores SET submitted_at = COALESCE(updated_at, created_at, datetime('now')) WHERE submitted_at IS NULL`);
+}
 db.exec(`UPDATE scores SET status = 'normal' WHERE status IS NULL OR status = ''`);
 db.exec(`UPDATE scores SET review_state = 'draft' WHERE review_state IS NULL OR review_state = ''`);
 // Check if we need to recreate scores table for proper foreign key constraint
-// This is a simplified check - we just try to delete a non-existent shooter to verify the constraint
+// or to drop legacy unique(shooter_id, stage_id) that blocks multiple submissions.
 try {
     const testResult = db.prepare(`PRAGMA foreign_key_list(scores)`).all();
     const shooterFk = testResult.find((fk) => fk.from === 'shooter_id');
-    if (shooterFk && shooterFk.on_delete !== 'CASCADE') {
+    const scoreIndexes = db.prepare(`PRAGMA index_list(scores)`).all();
+    const hasLegacyShooterStageUnique = scoreIndexes.some((idx) => {
+        if (!idx.unique)
+            return false;
+        const cols = db.prepare(`PRAGMA index_info(${JSON.stringify(idx.name)})`).all();
+        const names = cols.map((c) => c.name);
+        return names.length === 2 && names.includes('shooter_id') && names.includes('stage_id');
+    });
+    if ((shooterFk && shooterFk.on_delete !== 'CASCADE') || hasLegacyShooterStageUnique) {
         // Need to recreate scores table with proper cascade delete
         db.exec(`PRAGMA foreign_keys = OFF`);
         db.exec(`BEGIN TRANSACTION`);
@@ -290,12 +302,12 @@ try {
           confirmed INTEGER NOT NULL DEFAULT 0,
           created_at TEXT NOT NULL DEFAULT (datetime('now')),
           updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-          UNIQUE(shooter_id, stage_id)
+          submitted_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
       `);
             db.exec(`
-        INSERT INTO scores_new (id, match_id, shooter_id, stage_id, total_time, a_hits, c_hits, d_hits, m_hits, n_hits, pe, first_shot, fastest_split, status, review_state, review_submitted_at, total_points, hit_factor, confirmed, created_at, updated_at)
-        SELECT id, match_id, shooter_id, stage_id, total_time, a_hits, c_hits, d_hits, m_hits, n_hits, pe, first_shot, fastest_split, COALESCE(status, 'normal'), COALESCE(review_state, 'draft'), review_submitted_at, total_points, hit_factor, confirmed, created_at, updated_at
+        INSERT INTO scores_new (id, match_id, shooter_id, stage_id, total_time, a_hits, c_hits, d_hits, m_hits, n_hits, pe, first_shot, fastest_split, status, review_state, review_submitted_at, total_points, hit_factor, confirmed, created_at, updated_at, submitted_at)
+        SELECT id, match_id, shooter_id, stage_id, total_time, a_hits, c_hits, d_hits, m_hits, n_hits, pe, first_shot, fastest_split, COALESCE(status, 'normal'), COALESCE(review_state, 'draft'), review_submitted_at, total_points, hit_factor, confirmed, created_at, updated_at, COALESCE(submitted_at, created_at, datetime('now'))
         FROM scores
       `);
             db.exec(`DROP TABLE scores`);

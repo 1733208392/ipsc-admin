@@ -58,6 +58,26 @@ router.get('/', (req: Request, res: Response) => {
   }
 });
 
+// DELETE /matches/:matchId/squads/:squadId
+router.delete('/:squadId', (req: Request, res: Response) => {
+  const matchId = Number(req.params['matchId']);
+  const squadId = Number(req.params['squadId']);
+  try {
+    const squad = db
+      .prepare(`SELECT id, match_id FROM squads WHERE id = ?`)
+      .get(squadId) as { id: number; match_id: number } | undefined;
+    if (!squad || squad.match_id !== matchId) {
+      res.status(404).json(fail('Squad not found in this match'));
+      return;
+    }
+    db.prepare(`UPDATE shooters SET squad_id = NULL WHERE squad_id = ?`).run(squadId);
+    db.prepare(`DELETE FROM squads WHERE id = ?`).run(squadId);
+    res.json(ok({ id: squadId }));
+  } catch (err) {
+    res.status(500).json(fail(String(err)));
+  }
+});
+
 // PUT /squads/:id
 export function updateSquad(req: Request, res: Response): void {
   const id = Number(req.params['id']);
@@ -135,7 +155,7 @@ export function getSquadQueue(req: Request, res: Response): void {
                   COUNT(DISTINCT sc.stage_id) AS stages_done
            FROM shooters sh
            JOIN divisions d ON sh.division_id = d.id
-           LEFT JOIN scores sc ON sh.id = sc.shooter_id
+           LEFT JOIN scores sc ON sh.id = sc.shooter_id AND sc.review_state = 'submitted'
            WHERE sh.squad_id = ?
            GROUP BY sh.id
            ORDER BY sh.bib_number`

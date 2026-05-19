@@ -21,11 +21,7 @@ import shootersRouter, {
   changeShooterSquad,
   deleteShooter,
 } from './routes/shooters.js';
-import scoresRouter, {
-  getShooterScores,
-  confirmScore,
-  deleteScore,
-} from './routes/scores.js';
+import scoresRouter, { getShooterScores } from './routes/scores.js';
 import leaderboardRouter from './routes/leaderboard.js';
 import stageAttachmentsRouter from './routes/stage-attachments.js';
 import { getUploadsDir } from './services/stage-files.js';
@@ -86,8 +82,6 @@ api.delete('/shooters/:id', deleteShooter);
 // Scores
 api.use('/matches/:matchId/scores', scoresRouter);
 api.get('/shooters/:shooterId/scores', getShooterScores);
-api.put('/scores/:id/confirm', confirmScore);
-api.delete('/scores/:id', deleteScore);
 
 // Leaderboard
 api.use('/matches/:matchId/leaderboard', leaderboardRouter);

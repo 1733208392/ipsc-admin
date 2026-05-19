@@ -100,6 +100,7 @@ export interface Score {
   review_submitted_at: string | null
   confirmed: number
   created_at: string
+  submitted_at: string
   shooter_name?: string
   bib_number?: string
   stage_name?: string
@@ -139,6 +140,7 @@ export interface ScoreCardDetail {
     targets_count: number
     poppers_plates_count: number
   }
+  scores: Score[]
   score: Score | null
   rows: ScoreCardRow[]
   penalty_reasons: ScorePenaltyReason[]
@@ -166,7 +168,9 @@ export interface LeaderboardEntry {
     stage_points_earned: number
     hit_factor: number
     rank_in_stage: number
+    submission_seq?: number
   }>
+  submission_seq?: number
   hit_factor?: number
   percentage?: number
   stage_points_earned?: number

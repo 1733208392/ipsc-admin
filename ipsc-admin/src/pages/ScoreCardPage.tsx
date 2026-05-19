@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { useMatch } from '@/hooks/useMatch'
 import { PROCEDURAL_REASONS } from '@/lib/pe-reasons'
-import type { Match, Shooter, Stage, ScoreCardDetail, ScoreCardRow } from '@/types'
+import type { Match, Shooter, Stage, ScoreCardDetail, ScoreCardRow, Score } from '@/types'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -56,6 +56,8 @@ export function ScoreCardPage() {
   const [firstShot, setFirstShot] = useState<string>('')
   const [fastestSplit, setFastestSplit] = useState<string>('')
   const [reasonCounts, setReasonCounts] = useState<Record<string, number>>({})
+  const [allScores, setAllScores] = useState<Score[]>([])
+  const [selectedScoreId, setSelectedScoreId] = useState<number | null>(null)
 
   const selectedShooter = useMemo(
     () => shooters.find((item) => String(item.id) === selectedShooterId),
@@ -102,12 +104,14 @@ export function ScoreCardPage() {
     }
   }
 
-  async function loadScoreCard(shooterId: string, stageId: string) {
+  async function loadScoreCard(shooterId: string, stageId: string, scoreId?: number) {
     if (!matchId || !shooterId || !stageId) return
     setDetailLoading(true)
     try {
+      const params = new URLSearchParams({ shooter_id: shooterId, stage_id: stageId })
+      if (scoreId) params.set('score_id', String(scoreId))
       const detail = await api.get<ScoreCardDetail>(
-        `/matches/${matchId}/scores/score-card?shooter_id=${shooterId}&stage_id=${stageId}`
+        `/matches/${matchId}/scores/score-card?${params.toString()}`
       )
       applyDetail(detail)
     } catch (e) {
@@ -118,11 +122,15 @@ export function ScoreCardPage() {
   }
 
   function applyDetail(detail: ScoreCardDetail) {
+    setAllScores(detail.scores || [])
+    // Prefer the explicitly selected score returned by backend.
+    const scoreToShow = detail.score ?? (detail.scores && detail.scores.length > 0 ? detail.scores[0] : null)
+    setSelectedScoreId(scoreToShow?.id ?? null)
     setRows(detail.rows)
-    setStatus(detail.score?.status ?? 'normal')
-    setTotalTime(detail.score ? String(detail.score.total_time ?? '') : '')
-    setFirstShot(detail.score?.first_shot != null ? String(detail.score.first_shot) : '')
-    setFastestSplit(detail.score?.fastest_split != null ? String(detail.score.fastest_split) : '')
+    setStatus(scoreToShow?.status ?? 'normal')
+    setTotalTime(scoreToShow ? String(scoreToShow.total_time ?? '') : '')
+    setFirstShot(scoreToShow?.first_shot != null ? String(scoreToShow.first_shot) : '')
+    setFastestSplit(scoreToShow?.fastest_split != null ? String(scoreToShow.fastest_split) : '')
 
     const nextCounts: Record<string, number> = {}
     for (const reason of PROCEDURAL_REASONS) {
@@ -132,6 +140,11 @@ export function ScoreCardPage() {
       nextCounts[reason.reason_code] = reason.count
     }
     setReasonCounts(nextCounts)
+  }
+  // Allow user to select a previous submission to view
+  function handleSelectScore(score: Score) {
+    if (!selectedShooterId || !selectedStageId) return
+    void loadScoreCard(selectedShooterId, selectedStageId, score.id)
   }
 
   useEffect(() => {
@@ -256,6 +269,24 @@ export function ScoreCardPage() {
         <Button variant="outline" onClick={() => navigate(`/matches/${matchId}/scores`)}>返回成绩页</Button>
       </div>
 
+      {/* List of all submissions for this shooter/stage */}
+      {allScores.length > 1 && (
+        <div className="mb-4">
+          <div className="font-semibold mb-1">历史成绩提交</div>
+          <div className="flex flex-wrap gap-2">
+            {allScores.map((score) => (
+              <Button
+                key={score.id}
+                size="sm"
+                variant={score.id === selectedScoreId ? 'default' : 'outline'}
+                onClick={() => handleSelectScore(score)}
+              >
+                {score.submitted_at ? new Date(score.submitted_at).toLocaleString() : score.id}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-1">
           <Label>射手</Label>

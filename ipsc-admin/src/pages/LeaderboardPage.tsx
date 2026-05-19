@@ -65,6 +65,7 @@ function LeaderboardTable({
           <TableHead>组别</TableHead>
           {isStageMode ? (
             <>
+              <TableHead className="text-right">提交序号</TableHead>
               <TableHead className="text-right">HF</TableHead>
               <TableHead className="text-right">%</TableHead>
               <TableHead className="text-right">Stage Points</TableHead>
@@ -110,6 +111,7 @@ function LeaderboardTable({
                 </TableCell>
                 {isStageMode ? (
                   <>
+                    <TableCell className="text-right">#{Number(e.submission_seq ?? 1)}</TableCell>
                     <TableCell className="text-right">{Number(e.hit_factor ?? 0).toFixed(4)}</TableCell>
                     <TableCell className="text-right">{Number(e.percentage ?? 0).toFixed(2)}%</TableCell>
                     <TableCell className="text-right font-bold">{Number(e.stage_points_earned ?? 0).toFixed(2)}</TableCell>
@@ -137,6 +139,7 @@ function LeaderboardTable({
                           return (
                             <div key={`${e.id}-${stageId}`} className="flex flex-wrap gap-3 items-center">
                               <span className="font-medium min-w-36">{stageNameMap.get(Number(stageId)) ?? `Stage ${stageId}`}</span>
+                              <span>Seq #{detail.submission_seq ?? 1}</span>
                               <span>HF={detail.hit_factor.toFixed(4)}</span>
                               <span>{detail.percentage.toFixed(2)}%</span>
                               <span>{detail.stage_points_earned.toFixed(2)} pts</span>

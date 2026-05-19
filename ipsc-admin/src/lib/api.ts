@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:3001/api/v1'
+const API_BASE = '/api/v1'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const isFormData = options?.body instanceof FormData
@@ -8,10 +8,23 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     headers: defaultHeaders,
     ...options,
   })
+  const contentType = res.headers.get('content-type') || ''
+  const isJson = contentType.includes('application/json')
+
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error((err as { error?: string }).error || `HTTP ${res.status}`)
+    if (isJson) {
+      const err = await res.json().catch(() => ({ error: 'Network error' }))
+      throw new Error((err as { error?: string }).error || `HTTP ${res.status}`)
+    }
+
+    const text = await res.text().catch(() => '')
+    throw new Error(text ? `HTTP ${res.status}: ${text.slice(0, 120)}` : `HTTP ${res.status}`)
   }
+
+  if (!isJson) {
+    throw new Error(`Unexpected response type: ${contentType || 'unknown'}`)
+  }
+
   const json = await res.json()
   return (json as { data: T }).data
 }

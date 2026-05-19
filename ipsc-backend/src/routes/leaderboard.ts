@@ -147,6 +147,7 @@ router.get('/', (req: Request, res: Response) => {
             percentage: item.percentage,
             stage_points_earned: item.stage_points_earned,
             stage_points_max: item.stage_points_max,
+            submission_seq: item.submission_seq,
             total_points: item.total_points,
             total_time: item.total_time,
           };

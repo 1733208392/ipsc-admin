@@ -7,7 +7,7 @@ import {
   ok,
   fail,
 } from '../types.js';
-import { DEFAULT_DIVISIONS } from '../constants.js';
+import { DEFAULT_DIVISIONS, DIVISION_POWER_FACTOR } from '../constants.js';
 
 const router = Router();
 
@@ -28,8 +28,26 @@ router.post('/', (req: Request, res: Response) => {
     const insertDivision = db.prepare(
       `INSERT INTO divisions (match_id, code, name, sort_order) VALUES (?, ?, ?, ?)`
     );
+    const insertDivisionLegacy = db.prepare(
+      `INSERT INTO divisions (match_id, code, name, power_factor, sort_order) VALUES (?, ?, ?, ?, ?)`
+    );
     for (const division of DEFAULT_DIVISIONS) {
-      insertDivision.run(result.lastInsertRowid, division.code, division.name, division.sort_order);
+      try {
+        insertDivision.run(result.lastInsertRowid, division.code, division.name, division.sort_order);
+      } catch (err) {
+        // Legacy DBs can still have a non-null power_factor column.
+        if (String(err).includes('power_factor')) {
+          insertDivisionLegacy.run(
+            result.lastInsertRowid,
+            division.code,
+            division.name,
+            DIVISION_POWER_FACTOR[division.code],
+            division.sort_order
+          );
+          continue;
+        }
+        throw err;
+      }
     }
 
     const match = db.prepare(`SELECT * FROM matches WHERE id = ?`).get(result.lastInsertRowid);
@@ -42,7 +60,17 @@ router.post('/', (req: Request, res: Response) => {
 // GET /matches
 router.get('/', (_req: Request, res: Response) => {
   try {
-    const matches = db.prepare(`SELECT * FROM matches ORDER BY created_at DESC`).all();
+    const matches = db
+      .prepare(
+        `SELECT
+           m.*,
+           (SELECT COUNT(*) FROM divisions d WHERE d.match_id = m.id) AS divisions_count,
+           (SELECT COUNT(*) FROM stages st WHERE st.match_id = m.id) AS stages_count,
+           (SELECT COUNT(*) FROM squads sq WHERE sq.match_id = m.id) AS squads_count
+         FROM matches m
+         ORDER BY m.created_at DESC`
+      )
+      .all();
     res.json(ok(matches));
   } catch (err) {
     res.status(500).json(fail(String(err)));
@@ -119,9 +147,35 @@ router.patch('/:id/status', (req: Request, res: Response) => {
       res.status(404).json(fail('Match not found'));
       return;
     }
+    if (parsed.data.status === 'active') {
+      const stagesCount = (
+        db.prepare(`SELECT COUNT(*) as c FROM stages WHERE match_id = ?`).get(id) as { c: number }
+      ).c;
+      if (stagesCount === 0) {
+        res.status(400).json(fail('Cannot start match: assign at least one stage first'));
+        return;
+      }
+    }
     db.prepare(`UPDATE matches SET status = ? WHERE id = ?`).run(parsed.data.status, id);
     const updated = db.prepare(`SELECT * FROM matches WHERE id = ?`).get(id);
     res.json(ok(updated));
+  } catch (err) {
+    res.status(500).json(fail(String(err)));
+  }
+});
+
+// DELETE /matches/:id
+router.delete('/:id', (req: Request, res: Response) => {
+  const id = Number(req.params['id']);
+  try {
+    const match = db.prepare(`SELECT * FROM matches WHERE id = ?`).get(id);
+    if (!match) {
+      res.status(404).json(fail('Match not found'));
+      return;
+    }
+
+    db.prepare(`DELETE FROM matches WHERE id = ?`).run(id);
+    res.json(ok({ id }));
   } catch (err) {
     res.status(500).json(fail(String(err)));
   }

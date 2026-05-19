@@ -51,12 +51,29 @@ function getDivisionStageScores(matchId, stageId, shooterIds) {
         return [];
     const placeholders = shooterIds.map(() => '?').join(',');
     const sql = `
-    SELECT sc.shooter_id, sc.hit_factor, sc.total_points, sc.total_time
-    FROM scores sc
-    WHERE sc.match_id = ?
-      AND sc.stage_id = ?
-      AND sc.shooter_id IN (${placeholders})
-    ORDER BY sc.hit_factor DESC, sc.total_points DESC, sc.total_time ASC, sc.shooter_id ASC
+    WITH ranked AS (
+      SELECT
+        sc.shooter_id,
+        sc.hit_factor,
+        sc.total_points,
+        sc.total_time,
+        ROW_NUMBER() OVER (
+          PARTITION BY sc.shooter_id
+          ORDER BY COALESCE(sc.submitted_at, sc.created_at) ASC, sc.id ASC
+        ) AS submission_seq,
+        ROW_NUMBER() OVER (
+          PARTITION BY sc.shooter_id
+          ORDER BY sc.hit_factor DESC, sc.total_points DESC, sc.total_time ASC, sc.id ASC
+        ) AS best_rank
+      FROM scores sc
+      WHERE sc.match_id = ?
+        AND sc.stage_id = ?
+        AND sc.shooter_id IN (${placeholders})
+    )
+    SELECT shooter_id, hit_factor, total_points, total_time, submission_seq
+    FROM ranked
+    WHERE best_rank = 1
+    ORDER BY hit_factor DESC, total_points DESC, total_time ASC, shooter_id ASC
   `;
     return db.prepare(sql).all(matchId, stageId, ...shooterIds);
 }
@@ -88,6 +105,7 @@ export function calculateStageRanking(matchId, stageId, divisionId, categoryFilt
                 hit_factor: row.hit_factor,
                 total_points: row.total_points,
                 total_time: row.total_time,
+                submission_seq: row.submission_seq,
                 percentage: round2(percentage),
                 stage_points_earned: round2(earned),
                 stage_points_max: stagePointsMax,
@@ -141,6 +159,7 @@ export function calculateOverallRanking(matchId, divisionId, categoryFilter) {
                     hit_factor: score.hit_factor,
                     rank_in_stage: index + 1,
                     stage_points_max: stagePointsMax,
+                    submission_seq: score.submission_seq,
                 });
             });
         }

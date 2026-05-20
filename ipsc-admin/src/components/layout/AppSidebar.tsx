@@ -90,6 +90,11 @@ export function AppSidebar() {
               <Trophy className="h-4 w-4" />
               积分榜
             </NavLink>
+
+            <NavLink to={`/matches/${matchId}/leaderboard-live`} className={navLinkClass}>
+              <Trophy className="h-4 w-4" />
+              直播榜
+            </NavLink>
           </>
         )}
       </nav>

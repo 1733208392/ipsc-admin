@@ -12,6 +12,7 @@ import { ScoresPage } from '@/pages/ScoresPage'
 import { ScoreCardPage } from '@/pages/ScoreCardPage'
 import { ScoreCardSummaryPage } from '@/pages/ScoreCardSummaryPage'
 import { LeaderboardPage } from '@/pages/LeaderboardPage'
+import { LeaderboardLivestreamPage } from '@/pages/LeaderboardLivestreamPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { AdminClubsPage } from '@/pages/AdminClubsPage'
 import { AdminUsersPage } from '@/pages/AdminUsersPage'
@@ -59,6 +60,7 @@ export default function App() {
               <Route path="/matches/:id/score-card" element={<ScoreCardPage />} />
               <Route path="/matches/:id/score-card/summary" element={<ScoreCardSummaryPage />} />
               <Route path="/matches/:id/leaderboard" element={<LeaderboardPage />} />
+              <Route path="/matches/:id/leaderboard-live" element={<LeaderboardLivestreamPage />} />
               <Route
                 path="/admin/clubs"
                 element={

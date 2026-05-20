@@ -113,8 +113,9 @@ Content-Type: application/json
   "total_time": 12.35,
   "rows": [
     { "row_type": "steel", "row_no": 1, "A": 1, "C": 0, "D": 0, "M": 0, "N": 0 },
-    { "row_type": "steel", "row_no": 2, "A": 0, "C": 1, "D": 0, "M": 0, "N": 0 },
-    { "row_type": "paper", "row_no": 1, "A": 2, "C": 0, "D": 0, "M": 0, "N": 0 },
+    { "row_type": "steel", "row_no": 2, "A": 1, "C": 0, "D": 0, "M": 0, "N": 0 },
+    { "row_type": "steel", "row_no": 3, "A": 0, "C": 1, "D": 0, "M": 0, "N": 0 },
+    { "row_type": "paper", "row_no": 1, "A": 1, "C": 0, "D": 0, "M": 0, "N": 0 },
     { "row_type": "paper", "row_no": 2, "A": 1, "C": 1, "D": 0, "M": 0, "N": 0 }
   ],
   "hits": {
@@ -149,6 +150,8 @@ Content-Type: application/json
 | `fastest_split` | number | ❌ | 最快连发间隔（秒），可选 |
 
 > `rows` 与 `hits` 二选一即可；如果同时传，后端以 `rows` 自动汇总结果为准。
+
+> APopper 规则：`apopper` 命中必须作为**独立 steel 行**上传，不能并入其挂载纸靶/宿主目标行。
 
 ### Response `200`
 

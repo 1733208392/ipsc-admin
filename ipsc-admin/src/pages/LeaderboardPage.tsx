@@ -110,8 +110,8 @@ function LeaderboardTable({
                 </TableCell>
                 {isStageMode ? (
                   <>
-                    <TableCell className="text-right">{Number(e.hit_factor ?? 0).toFixed(4)}</TableCell>
-                    <TableCell className="text-right">{Number(e.percentage ?? 0).toFixed(2)}%</TableCell>
+                    <TableCell className="text-right">{Number(e.hit_factor ?? 0).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{Number(e.percentage ?? 0).toFixed(1)}%</TableCell>
                     <TableCell className="text-right font-bold">{Number(e.stage_points_earned ?? 0).toFixed(2)}</TableCell>
                     <TableCell className="text-right">{Number(e.total_points ?? 0).toFixed(2)}</TableCell>
                     <TableCell className="text-right text-muted-foreground">{Number(e.total_time ?? 0).toFixed(2)}</TableCell>
@@ -137,8 +137,8 @@ function LeaderboardTable({
                           return (
                             <div key={`${e.id}-${stageId}`} className="flex flex-wrap gap-3 items-center">
                               <span className="font-medium min-w-36">{stageNameMap.get(Number(stageId)) ?? `Stage ${stageId}`}</span>
-                              <span>HF={detail.hit_factor.toFixed(4)}</span>
-                              <span>{detail.percentage.toFixed(2)}%</span>
+                              <span>HF={detail.hit_factor.toFixed(2)}</span>
+                              <span>{detail.percentage.toFixed(1)}%</span>
                               <span>{detail.stage_points_earned.toFixed(2)} pts</span>
                               <span>{medal}</span>
                             </div>

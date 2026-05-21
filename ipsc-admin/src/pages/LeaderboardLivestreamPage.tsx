@@ -7,6 +7,9 @@ import { useToast } from '@/hooks/use-toast'
 import type { Division, LeaderboardEntry, LeaderboardResponse, Match, Stage } from '@/types'
 
 import { Button } from '@/components/ui/button'
+import backgroundImage from '@/assets/background.png'
+import rowBackgroundOne from '@/assets/row-1.png'
+import rowBackgroundTwo from '@/assets/row-2.png'
 
 const excludedDivisionCodes = new Set<Division['code']>(['standard', 'classic'])
 
@@ -18,23 +21,12 @@ const categories = [
   { value: 'lady', label: 'Lady' },
 ] as const
 
-const rowThemes = [
-  'from-rose-500 to-rose-400',
-  'from-blue-500 to-indigo-400',
-  'from-emerald-500 to-lime-400',
-  'from-amber-500 to-orange-400',
-  'from-fuchsia-400 to-pink-400',
-] as const
-
 function formatNumeric(value: number | undefined, digits: number): string {
   return Number(value ?? 0).toFixed(digits)
 }
 
-function getThemeClassByRank(index: number): string {
-  if (index < rowThemes.length) {
-    return rowThemes[index]
-  }
-  return 'from-slate-700 to-slate-600'
+function getAlternatingRowBackground(index: number): string {
+  return index % 2 === 0 ? rowBackgroundOne : rowBackgroundTwo
 }
 
 export function LeaderboardLivestreamPage() {
@@ -164,33 +156,55 @@ export function LeaderboardLivestreamPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-3rem)] rounded-2xl bg-gradient-to-br from-slate-100 via-slate-50 to-slate-100 p-4 md:p-8">
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm backdrop-blur">
-          <div className="mb-4 flex items-center justify-between gap-4 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
-            <span>Livestream Leaderboard</span>
-            <div className="flex items-center gap-2">
-              <span>Auto Switch: 10s</span>
-              <Button size="sm" variant="outline" className="rounded-full" onClick={() => void handleToggleFullscreen()}>
-                {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-              </Button>
-            </div>
+    <div
+      className="min-h-[calc(100vh-3rem)] px-3 py-4 text-white md:px-8 md:py-8"
+      style={{
+        backgroundImage: `linear-gradient(160deg, rgba(3, 5, 8, 0.62) 0%, rgba(4, 7, 12, 0.56) 45%, rgba(6, 8, 12, 0.62) 100%), url(${backgroundImage})`,
+        backgroundSize: '100% 100%, 100% 100%',
+        backgroundPosition: 'center, center',
+        backgroundRepeat: 'no-repeat, no-repeat',
+      }}
+    >
+      <div className="mx-auto max-w-[1600px] rounded-2xl p-3 md:p-6">
+        <div className="relative overflow-hidden rounded-xl px-4 pb-4 pt-3 md:px-10 md:pb-8 md:pt-5">
+          <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:44px_44px]" />
+
+          <div className="relative mb-4 flex justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 rounded-md border-zinc-500/60 bg-black/30 px-3 text-[11px] uppercase tracking-[0.18em] text-zinc-100 hover:bg-black/45"
+              onClick={() => void handleToggleFullscreen()}
+            >
+              {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+            </Button>
           </div>
 
-          <div className="text-center">
-            <h1 className="text-2xl font-black tracking-tight text-slate-900 md:text-4xl">
-              {activeDivisionName} | {activeCategoryLabel}
+          <div className="relative text-center">
+            <h1 className="text-[22px] font-black italic uppercase leading-none tracking-[0.03em] text-zinc-100 md:text-[44px]">
+              <span className="bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-500 bg-clip-text text-transparent">
+                {activeDivisionName}
+              </span>
+              <span className="mx-2 text-red-600 md:mx-4">/</span>
+              <span className="text-red-500">{activeCategoryLabel.toUpperCase()}</span>
             </h1>
+            <p className="mt-2 text-[9px] font-semibold uppercase tracking-[0.34em] text-zinc-500 md:text-[11px]">
+              IPSC Shooting Game
+            </p>
           </div>
 
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <div className="relative mt-10 flex flex-wrap justify-center gap-2 md:mt-12 md:gap-3">
             {categories.map((c) => (
               <Button
                 key={c.value || 'all-category'}
-                variant={selectedCategory === c.value ? 'default' : 'outline'}
+                variant="ghost"
                 size="sm"
                 onClick={() => setSelectedCategory(c.value)}
-                className="rounded-full"
+                className={`h-10 min-w-24 rounded-none border px-5 text-xs font-bold uppercase tracking-[0.08em] [clip-path:polygon(7%_0,93%_0,100%_50%,93%_100%,7%_100%,0_50%)] md:min-w-36 md:text-lg ${
+                  selectedCategory === c.value
+                    ? 'border-red-500/90 bg-[linear-gradient(110deg,rgba(127,29,29,0.96),rgba(239,68,68,0.72))] text-zinc-100 shadow-[0_0_24px_rgba(239,68,68,0.35)]'
+                    : 'border-zinc-600 bg-zinc-900/70 text-zinc-300 hover:bg-zinc-800'
+                }`}
               >
                 {c.label}
               </Button>
@@ -199,26 +213,26 @@ export function LeaderboardLivestreamPage() {
         </div>
 
         {loading ? (
-          <div className="space-y-3">
+          <div className="mt-4 space-y-3">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-20 animate-pulse rounded-2xl bg-slate-200" />
+              <div key={i} className="h-20 animate-pulse rounded-xl bg-black/35" />
             ))}
           </div>
         ) : divisions.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-600">
+          <div className="mt-4 rounded-xl bg-black/35 p-10 text-center text-zinc-300">
             No eligible divisions to display. Standard and Classic are hidden for livestream mode.
           </div>
         ) : stages.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-600">
+          <div className="mt-4 rounded-xl bg-black/35 p-10 text-center text-zinc-300">
             No stage is available, so livestream leaderboard cannot be calculated.
           </div>
         ) : rankings.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-600">
+          <div className="mt-4 rounded-xl bg-black/35 p-10 text-center text-zinc-300">
             No rankings found for this division and category.
           </div>
         ) : (
-          <div>
-            <div className="mb-2 grid grid-cols-[88px_1.3fr_1fr_1fr_1fr] items-center px-4 text-xs font-bold uppercase tracking-[0.14em] text-slate-500 md:px-6">
+          <div className="mt-4">
+            <div className="grid grid-cols-[72px_1.2fr_0.8fr_0.8fr_1fr] items-center rounded-t-lg bg-black/35 px-3 py-3 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-300 md:grid-cols-[110px_1.4fr_1fr_1fr_1fr] md:px-6 md:text-[16px] md:tracking-[0.08em]">
               <span>Rank</span>
               <span>Name</span>
               <span className="text-right">HF</span>
@@ -226,25 +240,35 @@ export function LeaderboardLivestreamPage() {
               <span className="text-right">Stage Points</span>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 p-2 md:p-4">
               {rankings.map((entry, idx) => {
                 const rank = entry.rank_in_stage ?? idx + 1
+                const rowBackground = getAlternatingRowBackground(idx)
                 return (
                   <div
                     key={entry.id}
-                    className={`grid grid-cols-[88px_1.3fr_1fr_1fr_1fr] items-center rounded-2xl bg-gradient-to-r px-4 py-4 text-white shadow-md md:px-6 md:py-5 ${getThemeClassByRank(idx)}`}
+                    className="relative bg-center bg-no-repeat px-3 py-3 text-white md:grid md:grid-cols-[110px_1.4fr_1fr_1fr_1fr] md:px-6 md:py-4"
+                    style={{
+                      backgroundImage: `url(${rowBackground})`,
+                      backgroundSize: '100% 100%',
+                    }}
                   >
-                    <div className="text-4xl font-black leading-none drop-shadow-sm">{rank}</div>
-                    <div className="pr-2">
-                      <div className="truncate text-lg font-extrabold md:text-2xl">{entry.name}</div>
+                    <div className="relative grid grid-cols-[72px_1fr] items-center gap-2 md:block">
+                      <div className="text-4xl font-black leading-none text-zinc-100 md:text-[44px]">{rank}</div>
                     </div>
-                    <div className="text-right text-xl font-black md:text-3xl">
+                    <div className="relative pr-2">
+                      <div className="truncate text-xl font-black text-zinc-100 md:text-[28px]">{entry.name}</div>
+                      <div className="mt-1 text-[10px] font-semibold tracking-[0.2em] text-zinc-400 md:text-[13px]">
+                        #{String(entry.bib_number ?? '').padStart(4, '0')}
+                      </div>
+                    </div>
+                    <div className="relative mt-2 text-right text-2xl font-black text-zinc-100 md:mt-0 md:text-[32px]">
                       {formatNumeric(entry.hit_factor, 2)}
                     </div>
-                    <div className="text-right text-xl font-black md:text-3xl">
+                    <div className="relative text-right text-2xl font-black text-zinc-100 md:text-[32px]">
                       {formatNumeric(entry.percentage, 1)}%
                     </div>
-                    <div className="text-right text-xl font-black md:text-3xl">
+                    <div className="relative text-right text-2xl font-black text-zinc-100 md:text-[32px]">
                       {formatNumeric(entry.stage_points_earned, 2)}
                     </div>
                   </div>

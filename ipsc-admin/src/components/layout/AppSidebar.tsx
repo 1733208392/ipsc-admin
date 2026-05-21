@@ -11,34 +11,36 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     isActive && 'bg-accent text-accent-foreground font-medium'
   )
 
-export function AppSidebar() {
+export function AppSidebar({ collapsed = false }: { collapsed?: boolean }) {
   const { id } = useParams<{ id: string }>()
   const { currentMatch } = useMatch()
   const { user, logout } = useAuth()
   const matchId = id ?? currentMatch?.id
 
   return (
-    <aside className="w-56 shrink-0 border-r bg-sidebar h-screen flex flex-col">
-      <div className="flex items-center gap-2 px-4 py-4 border-b">
+    <aside className={cn('shrink-0 border-r bg-sidebar h-screen flex flex-col transition-all duration-200', collapsed ? 'w-16' : 'w-56')}>
+      <div className={cn('flex items-center px-4 py-4 border-b', collapsed ? 'justify-center' : 'gap-2')}>
         <Target className="h-5 w-5 text-primary" />
-        <span className="font-bold text-base">IPSC 管理</span>
+        {!collapsed ? <span className="font-bold text-base">IPSC 管理</span> : null}
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2 space-y-1">
         {user?.role === 'super_admin' ? (
           <>
-            <p className="px-3 py-1 text-xs text-muted-foreground font-medium uppercase tracking-wide">平台管理</p>
+            {!collapsed ? (
+              <p className="px-3 py-1 text-xs text-muted-foreground font-medium uppercase tracking-wide">平台管理</p>
+            ) : null}
             <NavLink to="/admin/clubs" className={navLinkClass}>
               <Building2 className="h-4 w-4" />
-              俱乐部管理
+              {!collapsed ? '俱乐部管理' : null}
             </NavLink>
             <NavLink to="/admin/users" className={navLinkClass}>
               <UserCog className="h-4 w-4" />
-              用户管理
+              {!collapsed ? '用户管理' : null}
             </NavLink>
             <NavLink to="/admin/matches" className={navLinkClass}>
               <Shield className="h-4 w-4" />
-              全平台赛事
+              {!collapsed ? '全平台赛事' : null}
             </NavLink>
             <Separator className="my-2" />
           </>
@@ -46,54 +48,56 @@ export function AppSidebar() {
 
         <NavLink to="/" className={navLinkClass} end>
           <List className="h-4 w-4" />
-          赛事列表
+          {!collapsed ? '赛事列表' : null}
         </NavLink>
 
         {matchId && (
           <>
             <Separator className="my-2" />
-            <p className="px-3 py-1 text-xs text-muted-foreground font-medium uppercase tracking-wide truncate">
-              {currentMatch?.name ?? `赛事 #${matchId}`}
-            </p>
+            {!collapsed ? (
+              <p className="px-3 py-1 text-xs text-muted-foreground font-medium uppercase tracking-wide truncate">
+                {currentMatch?.name ?? `赛事 #${matchId}`}
+              </p>
+            ) : null}
 
             <NavLink to={`/matches/${matchId}/divisions`} className={navLinkClass}>
               <Layers className="h-4 w-4" />
-              组别
+              {!collapsed ? '组别' : null}
             </NavLink>
 
             <NavLink to={`/matches/${matchId}/stages`} className={navLinkClass}>
               <ClipboardList className="h-4 w-4" />
-              Stage
+              {!collapsed ? 'Stage' : null}
             </NavLink>
 
             <NavLink to={`/matches/${matchId}/squads`} className={navLinkClass}>
               <Group className="h-4 w-4" />
-              Squad
+              {!collapsed ? 'Squad' : null}
             </NavLink>
 
             <NavLink to={`/matches/${matchId}/shooters`} className={navLinkClass}>
               <Users className="h-4 w-4" />
-              射手
+              {!collapsed ? '射手' : null}
             </NavLink>
 
             <NavLink to={`/matches/${matchId}/scores`} className={navLinkClass}>
               <ClipboardList className="h-4 w-4" />
-              成绩
+              {!collapsed ? '成绩' : null}
             </NavLink>
 
             <NavLink to={`/matches/${matchId}/score-card`} className={navLinkClass}>
               <ClipboardList className="h-4 w-4" />
-              评分卡
+              {!collapsed ? '评分卡' : null}
             </NavLink>
 
             <NavLink to={`/matches/${matchId}/leaderboard`} className={navLinkClass}>
               <Trophy className="h-4 w-4" />
-              积分榜
+              {!collapsed ? '积分榜' : null}
             </NavLink>
 
             <NavLink to={`/matches/${matchId}/leaderboard-live`} className={navLinkClass}>
               <Trophy className="h-4 w-4" />
-              直播榜
+              {!collapsed ? '直播榜' : null}
             </NavLink>
           </>
         )}
@@ -106,7 +110,7 @@ export function AppSidebar() {
           onClick={() => void logout()}
         >
           <LogOut className="h-4 w-4" />
-          退出登录
+          {!collapsed ? '退出登录' : null}
         </button>
       </div>
     </aside>

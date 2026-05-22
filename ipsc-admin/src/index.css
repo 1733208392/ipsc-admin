@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@700;900&family=Orbitron:wght@700;800;900&family=Rajdhani:wght@500;600;700&family=Teko:wght@500;600;700&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -75,4 +76,19 @@ body {
   background-color: var(--color-background);
   color: var(--color-foreground);
   font-family: system-ui, -apple-system, sans-serif;
+}
+
+.ls-title-font {
+  font-family: "Noto Sans SC", "Teko", "Arial Narrow", sans-serif;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.ls-ui-font {
+  font-family: "Rajdhani", "Noto Sans SC", sans-serif;
+}
+
+.ls-number-font {
+  font-family: "Orbitron", "Rajdhani", sans-serif;
+  font-variant-numeric: tabular-nums;
 }

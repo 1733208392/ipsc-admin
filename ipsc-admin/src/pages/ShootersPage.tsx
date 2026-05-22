@@ -213,7 +213,16 @@ export function ShootersPage() {
             {shooters.map(s => (
               <TableRow key={s.id}>
                 <TableCell className="font-mono font-medium">{s.bib_number}</TableCell>
-                <TableCell>{s.name}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <span>{s.name}</span>
+                    {Boolean(s.is_dq) ? (
+                      <span className="rounded bg-orange-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                        DQ
+                      </span>
+                    ) : null}
+                  </div>
+                </TableCell>
                 <TableCell>{s.division_name}</TableCell>
                 <TableCell>{shooterCategoryLabel(s.category_code)}</TableCell>
                 <TableCell>{s.age ?? '-'}</TableCell>

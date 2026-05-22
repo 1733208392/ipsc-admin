@@ -105,7 +105,14 @@ router.get('/', (req: Request, res: Response) => {
     if (squadId !== null) {
       shooters = db
         .prepare(
-          `SELECT sh.*, d.name AS division_name, sq.name AS squad_name
+          `SELECT sh.*, d.name AS division_name, sq.name AS squad_name,
+                  CASE WHEN EXISTS (
+                    SELECT 1
+                    FROM scores sc
+                    WHERE sc.match_id = sh.match_id
+                      AND sc.shooter_id = sh.id
+                      AND sc.status = 'dq'
+                  ) THEN 1 ELSE 0 END AS is_dq
            FROM shooters sh
            JOIN divisions d ON sh.division_id = d.id
             LEFT JOIN squads sq ON sh.squad_id = sq.id
@@ -116,7 +123,14 @@ router.get('/', (req: Request, res: Response) => {
     } else {
       shooters = db
         .prepare(
-          `SELECT sh.*, d.name AS division_name, sq.name AS squad_name
+          `SELECT sh.*, d.name AS division_name, sq.name AS squad_name,
+                  CASE WHEN EXISTS (
+                    SELECT 1
+                    FROM scores sc
+                    WHERE sc.match_id = sh.match_id
+                      AND sc.shooter_id = sh.id
+                      AND sc.status = 'dq'
+                  ) THEN 1 ELSE 0 END AS is_dq
            FROM shooters sh
            JOIN divisions d ON sh.division_id = d.id
             LEFT JOIN squads sq ON sh.squad_id = sq.id

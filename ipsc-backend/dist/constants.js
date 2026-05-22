@@ -1,9 +1,10 @@
+// All divisions score as minor (A=5, C=3, D=1) by club policy.
 export const DIVISION_POWER_FACTOR = {
     production: 'minor',
     optics: 'minor',
-    open: 'major',
-    standard: 'major',
-    classic: 'major',
+    open: 'minor',
+    standard: 'minor',
+    classic: 'minor',
 };
 export const CATEGORY_THRESHOLDS = {
     junior: { max_age: 21 },

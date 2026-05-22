@@ -42,6 +42,11 @@ function canEditField(rowType: 'paper' | 'steel', field: RowField): boolean {
   return true
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  return String(error)
+}
+
 export function ScoreCardPage() {
   const { id: matchId } = useParams<{ id: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -78,6 +83,8 @@ export function ScoreCardPage() {
     [stages, selectedStageId]
   )
 
+  const selectedShooterIsDq = Boolean(selectedShooter?.is_dq)
+
   const totalPE = useMemo(
     () => Object.values(reasonCounts).reduce((sum, n) => sum + n, 0),
     [reasonCounts]
@@ -107,7 +114,7 @@ export function ScoreCardPage() {
       setStages(stagesData)
       setCurrentMatch(match)
     } catch (e) {
-      toast({ title: '加载失败', description: String(e), variant: 'destructive' })
+      toast({ title: '加载失败', description: getErrorMessage(e), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -124,7 +131,7 @@ export function ScoreCardPage() {
       )
       applyDetail(detail)
     } catch (e) {
-      toast({ title: '评分卡加载失败', description: String(e), variant: 'destructive' })
+      toast({ title: '评分卡加载失败', description: getErrorMessage(e), variant: 'destructive' })
     } finally {
       setDetailLoading(false)
     }
@@ -233,7 +240,7 @@ export function ScoreCardPage() {
       toast({ title: '评分卡已保存' })
       return true
     } catch (e) {
-      toast({ title: '保存失败', description: String(e), variant: 'destructive' })
+      toast({ title: '保存失败', description: getErrorMessage(e), variant: 'destructive' })
       return false
     } finally {
       setSaving(false)
@@ -253,7 +260,7 @@ export function ScoreCardPage() {
       toast({ title: '成绩已删除' })
       await loadScoreCard(selectedShooterId, selectedStageId)
     } catch (e) {
-      toast({ title: '删除失败', description: String(e), variant: 'destructive' })
+      toast({ title: '删除失败', description: getErrorMessage(e), variant: 'destructive' })
     }
   }
 
@@ -308,7 +315,7 @@ export function ScoreCardPage() {
             <SelectContent>
               {shooters.map((s) => (
                 <SelectItem key={s.id} value={String(s.id)}>
-                  {s.bib_number} - {s.name}
+                  {s.bib_number} - {s.name}{Boolean(s.is_dq) ? ' • DQ' : ''}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -334,7 +341,14 @@ export function ScoreCardPage() {
 
       {(selectedShooter || selectedStage) && (
         <div className="rounded-md border p-3 text-sm text-muted-foreground">
-          <div>{selectedShooter ? `${selectedShooter.name} (${selectedShooter.bib_number})` : '未选择射手'}</div>
+          <div className="flex items-center gap-2">
+            <span>{selectedShooter ? `${selectedShooter.name} (${selectedShooter.bib_number})` : '未选择射手'}</span>
+            {selectedShooterIsDq ? (
+              <span className="rounded bg-orange-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                DQ
+              </span>
+            ) : null}
+          </div>
           <div>{selectedStage ? selectedStage.name : '未选择 Stage'}</div>
         </div>
       )}

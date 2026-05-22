@@ -186,6 +186,9 @@ export const AddShooterToSquadSchema = z.object({
 });
 
 // ── Scores / FlexTarget ───────────────────────────────────────────────────────
+// Per-target row as emitted by the mobile (iOS) score card. The mobile app is
+// the source of truth for the row grid — the backend no longer redistributes
+// or pads rows to match stage configuration.
 export const FlexTargetPerTargetRowSchema = z.object({
   row_type: z.enum(['paper', 'steel']),
   row_no: z.number().int().positive(),
@@ -196,31 +199,36 @@ export const FlexTargetPerTargetRowSchema = z.object({
   N: z.number().int().min(0),
 });
 
+// A single procedural-penalty reason added by the RO on the mobile app.
+export const FlexTargetPenaltyReasonSchema = z.object({
+  reason_code: z.string().min(1),
+  reason_label: z.string().min(1).optional(),
+  count: z.number().int().min(1),
+  sort_order: z.number().int().min(0).optional(),
+});
+
+// Penalties block: the mobile app reports only RO-added (additional) PE.
+// Auto PE for unengaged paper targets is derived by the backend from `rows`.
+// `PE` is kept for backward compatibility with the original payload and is
+// interpreted as `additional_pe` when `additional_pe` is not provided.
+export const FlexTargetPenaltiesSchema = z.object({
+  additional_pe: z.number().int().min(0).optional(),
+  reasons: z.array(FlexTargetPenaltyReasonSchema).optional(),
+  PE: z.number().int().min(0).optional(),
+});
+
 export const FlexTargetSchema = z.object({
   shooter_bib: z.string().min(1),
   stage_id: z.union([z.string().min(1), z.number()]),
-  total_time: z.number().positive(),
-  hits: z.object({
-    A: z.number().int().min(0),
-    C: z.number().int().min(0),
-    D: z.number().int().min(0),
-    M: z.number().int().min(0),
-    N: z.number().int().min(0),
-  }).optional(),
-  rows: z.array(FlexTargetPerTargetRowSchema).min(1).optional(),
-  penalties: z.object({
-    PE: z.number().int().min(0),
-  }),
+  // total_time may be 0 when status is DQ/DNF; calculate-time validations
+  // happen in the route handler based on `status`.
+  total_time: z.number().min(0),
+  status: z.enum(['normal', 'dnf', 'dq']).optional().default('normal'),
+  // The row grid IS the score card. Required.
+  rows: z.array(FlexTargetPerTargetRowSchema).min(1),
+  penalties: FlexTargetPenaltiesSchema.optional().default({}),
   first_shot: z.number().optional(),
   fastest_split: z.number().optional(),
-}).superRefine((data, ctx) => {
-  if (!data.hits && (!data.rows || data.rows.length === 0)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Either hits or rows is required',
-      path: ['hits'],
-    });
-  }
 });
 
 export const ScoreStatusSchema = z.enum(['normal', 'dnf', 'dq']);

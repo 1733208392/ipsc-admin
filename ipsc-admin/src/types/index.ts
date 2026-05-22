@@ -126,6 +126,7 @@ export interface Shooter {
   division_name?: string
   squad_name?: string
   stages_shot?: number
+  is_dq?: boolean | number
 }
 
 export interface Score {

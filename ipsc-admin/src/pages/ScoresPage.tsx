@@ -174,7 +174,16 @@ export function ScoresPage() {
               {matrix.map(({ shooter, stageScores, totalPoints }) => (
                 <TableRow key={shooter.id}>
                   <TableCell className="sticky left-0 bg-background font-mono">{shooter.bib_number}</TableCell>
-                  <TableCell className="sticky left-12 bg-background">{shooter.name}</TableCell>
+                  <TableCell className="sticky left-12 bg-background">
+                    <div className="flex items-center gap-2">
+                      <span>{shooter.name}</span>
+                      {Boolean(shooter.is_dq) ? (
+                        <span className="rounded bg-orange-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                          DQ
+                        </span>
+                      ) : null}
+                    </div>
+                  </TableCell>
                   <TableCell>{shooter.squad_name}</TableCell>
                   {visibleStages.map(st => {
                     const attempts = stageScores[st.id] ?? []

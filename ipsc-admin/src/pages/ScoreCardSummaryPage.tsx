@@ -7,6 +7,11 @@ import type { ScoreCardDetail } from '@/types'
 
 import { Button } from '@/components/ui/button'
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  return String(error)
+}
+
 export function ScoreCardSummaryPage() {
   const { id: matchId } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
@@ -33,7 +38,7 @@ export function ScoreCardSummaryPage() {
         )
         setDetail(data)
       } catch (e) {
-        toast({ title: 'Summary 加载失败', description: String(e), variant: 'destructive' })
+        toast({ title: 'Summary 加载失败', description: getErrorMessage(e), variant: 'destructive' })
       } finally {
         setLoading(false)
       }
@@ -74,7 +79,7 @@ export function ScoreCardSummaryPage() {
       toast({ title: '评分卡已提交复核' })
       navigate(`/matches/${matchId}/scores`)
     } catch (e) {
-      toast({ title: '提交失败', description: String(e), variant: 'destructive' })
+      toast({ title: '提交失败', description: getErrorMessage(e), variant: 'destructive' })
     } finally {
       setSubmitting(false)
     }

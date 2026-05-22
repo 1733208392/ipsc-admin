@@ -244,9 +244,15 @@ function getScoreCardPayload(matchId: number, shooterId: number, stageId: number
     .prepare(`SELECT * FROM scores WHERE shooter_id = ? AND stage_id = ? ORDER BY submitted_at DESC, id DESC`)
     .all(shooterId, stageId) as ScoreRow[];
 
+  // Always prefer the mobile (iOS) score over any admin draft, regardless of
+  // which one was written last. The mobile score card is the canonical source
+  // of truth; admin drafts are only used as a fallback when no iOS submission
+  // exists for this shooter/stage.
   const score = scoreId
     ? scores.find((item) => item.id === scoreId) ?? null
-    : (scores[0] ?? null);
+    : (scores.find((item) => item.review_state === 'submitted')
+        ?? scores[0]
+        ?? null);
 
   if (scoreId && !score) {
     return null;
@@ -274,21 +280,65 @@ function getScoreCardPayload(matchId: number, shooterId: number, stageId: number
         .all(score.id) as ScorePenaltyReason[])
     : [];
 
+  // Always return the rows exactly as submitted by mobile (iOS) — do not
+  // synthesize or redistribute. If there are no per-target rows persisted
+  // (e.g. legacy entries without score_card_rows), return an empty grid
+  // so the admin UI reflects mobile's actual score card 1:1.
   return {
     shooter,
     stage,
     scores,
     score: score ?? null,
-    rows: rows.length > 0
-      ? rows
-      : score
-        ? buildRowsFromScore(stage, score)
-        : buildDefaultRows(stage),
+    rows,
     penalty_reasons: penalties,
   };
 }
 
 // POST /matches/:matchId/scores/flextarget
+//
+// Mobile (iOS) is the single source of truth for the score card.
+// The payload describes the per-target row grid plus the RO‑added penalties
+// and run status; the backend ignores any stage config (targets_count /
+// poppers_plates_count) and derives every aggregate from `rows`.
+//
+// Request body (v2):
+//   {
+//     "shooter_bib": "123",
+//     "stage_id": "S1",                            // string or number
+//     "total_time": 12.34,                         // 0 allowed if DQ/DNF
+//     "status": "normal" | "dnf" | "dq",
+//     "rows": [                                    // REQUIRED, source of truth
+//       { "row_type": "paper"|"steel", "row_no": 1,
+//         "A": 0, "C": 0, "D": 0, "M": 0, "N": 0 }
+//     ],
+//     "penalties": {
+//       "additional_pe": 0,                        // RO-added PE total
+//       "reasons": [                               // optional breakdown
+//         { "reason_code": "10.2.1",
+//           "reason_label": "Foot fault",
+//           "count": 1, "sort_order": 0 }
+//       ],
+//       "PE": 0                                    // legacy alias of additional_pe
+//     },
+//     "first_shot": 1.20,
+//     "fastest_split": 0.30
+//   }
+//
+// Response (200):
+//   {
+//     "score_id": 99, "status": "normal",
+//     "totals": { "A": 6, "C": 2, "D": 0, "M": 0, "N": 0 },
+//     "rows": [ ...echoed back... ],
+//     "penalties": {
+//       "auto_pe": 0,                              // unengaged paper targets
+//       "additional_pe": 1,                        // from request
+//       "total_pe": 1,                             // auto_pe + additional_pe
+//       "reasons": [ ... ]
+//     },
+//     "total_time": 12.34,
+//     "total_points": 50, "hit_factor": 4.0518,
+//     "scores": [ ...all submissions for this shooter/stage... ]
+//   }
 router.post('/flextarget', (req: Request, res: Response) => {
   const matchId = Number(req.params['matchId']);
   const parsed = FlexTargetSchema.safeParse(req.body);
@@ -297,8 +347,16 @@ router.post('/flextarget', (req: Request, res: Response) => {
     return;
   }
 
-  const { shooter_bib, stage_id, total_time, hits, rows: perTargetRows, penalties, first_shot, fastest_split } =
-    parsed.data;
+  const {
+    shooter_bib,
+    stage_id,
+    total_time,
+    status,
+    rows: perTargetRows,
+    penalties,
+    first_shot,
+    fastest_split,
+  } = parsed.data;
 
   try {
     // 1. Find shooter by bib number in this match
@@ -310,7 +368,9 @@ router.post('/flextarget', (req: Request, res: Response) => {
       return;
     }
 
-    // 2. Find stage: try name match first, then id
+    // 2. Find stage: try name match first, then id. The stage row is used
+    //    only for identity/foreign-key — its targets_count is intentionally
+    //    NOT used to validate or reshape the row grid.
     let stage: Stage | undefined;
     const stageIdStr = String(stage_id);
     stage = db
@@ -343,91 +403,147 @@ router.post('/flextarget', (req: Request, res: Response) => {
       return;
     }
 
-    const computedHits = perTargetRows && perTargetRows.length > 0
-      ? perTargetRows.reduce(
-          (acc, row) => ({
-            A: acc.A + row.A,
-            C: acc.C + row.C,
-            D: acc.D + row.D,
-            M: acc.M + row.M,
-            N: acc.N + row.N,
-          }),
-          { A: 0, C: 0, D: 0, M: 0, N: 0 }
-        )
-      : {
-          A: hits?.A ?? 0,
-          C: hits?.C ?? 0,
-          D: hits?.D ?? 0,
-          M: hits?.M ?? 0,
-          N: hits?.N ?? 0,
-        };
+    // 4. Normalize rows (cap N per row at 2 — IPSC max no-shoot hits per target)
+    //    and derive aggregate hits straight from the row grid.
+    const normalizedRows = perTargetRows.map((row) => ({
+      ...row,
+      N: Math.min(row.N, 2),
+    }));
 
-    const cappedNHits = capNsByTarget(computedHits.N, stage.targets_count);
-
-    // 4. Calculate score
-    const { totalPoints, hitFactor } = calculateScore(
-      {
-        ...hits,
-        ...computedHits,
-        N: cappedNHits,
-      },
-      penalties,
-      total_time,
-      powerFactor,
-      'normal'
+    const totals = normalizedRows.reduce(
+      (acc, row) => ({
+        A: acc.A + row.A,
+        C: acc.C + row.C,
+        D: acc.D + row.D,
+        M: acc.M + row.M,
+        N: acc.N + row.N,
+      }),
+      { A: 0, C: 0, D: 0, M: 0, N: 0 }
     );
 
-    // 5. Insert new score submission
+    // 5. Penalties: auto PE for unengaged paper targets + RO-added PE.
+    const autoPe = normalizedRows.filter(
+      (row) => row.row_type === 'paper' && row.A + row.C + row.D === 0
+    ).length;
+    const reasons = penalties.reasons ?? [];
+    const reasonsSum = reasons.reduce((sum, r) => sum + r.count, 0);
+    const additionalPe = penalties.additional_pe
+      ?? penalties.PE
+      ?? reasonsSum;
+    const totalPe = autoPe + additionalPe;
+
+    // 6. Compute score from row-derived totals + total PE.
+    const { totalPoints, hitFactor } = calculateScore(
+      totals,
+      { PE: totalPe },
+      total_time,
+      powerFactor,
+      status
+    );
+
+    // 7. Insert score header.
     const insertScoreResult = db.prepare(
       `INSERT INTO scores
         (match_id, shooter_id, stage_id, total_time, a_hits, c_hits, d_hits, m_hits, n_hits, pe,
          first_shot, fastest_split, status, review_state, review_submitted_at, total_points, hit_factor, updated_at, submitted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'normal', 'submitted', datetime('now'), ?, ?, datetime('now'), datetime('now'))`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'submitted', datetime('now'), ?, ?, datetime('now'), datetime('now'))`
     ).run(
       matchId,
       shooter.id,
       stage.id,
       total_time,
-      computedHits.A,
-      computedHits.C,
-      computedHits.D,
-      computedHits.M,
-      cappedNHits,
-      penalties.PE,
+      totals.A,
+      totals.C,
+      totals.D,
+      totals.M,
+      totals.N,
+      totalPe,
       first_shot ?? null,
       fastest_split ?? null,
+      status,
       totalPoints,
       hitFactor
     );
+    const scoreId = Number(insertScoreResult.lastInsertRowid);
 
-    if (perTargetRows && perTargetRows.length > 0) {
-      const scoreId = Number(insertScoreResult.lastInsertRowid);
-      const insertRow = db.prepare(
-        `INSERT INTO score_card_rows
-         (score_id, row_type, row_no, a_hits, c_hits, d_hits, m_hits, ns_hits, npm_hits)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    // 8. Persist the row grid exactly as received from the mobile app.
+    const insertRow = db.prepare(
+      `INSERT INTO score_card_rows
+       (score_id, row_type, row_no, a_hits, c_hits, d_hits, m_hits, ns_hits, npm_hits)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    );
+    for (const row of normalizedRows) {
+      insertRow.run(
+        scoreId,
+        row.row_type,
+        row.row_no,
+        row.A,
+        row.C,
+        row.D,
+        row.M,
+        row.N,
+        0
       );
-      for (const row of perTargetRows) {
-        insertRow.run(
+    }
+
+    // 9. Persist RO-added penalty reasons (if provided) so the admin review
+    //    page can display the same breakdown the RO entered on the iOS app.
+    if (reasons.length > 0) {
+      const insertReason = db.prepare(
+        `INSERT INTO score_penalties (score_id, reason_code, reason_label, count, sort_order)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(score_id, reason_code) DO UPDATE SET
+           reason_label = excluded.reason_label,
+           count        = excluded.count,
+           sort_order   = excluded.sort_order`
+      );
+      for (const reason of reasons) {
+        insertReason.run(
           scoreId,
-          row.row_type,
-          row.row_no,
-          row.A,
-          row.C,
-          row.D,
-          row.M,
-          Math.min(row.N, 2),
-          0
+          reason.reason_code,
+          reason.reason_label ?? reason.reason_code,
+          reason.count,
+          reason.sort_order ?? 0
         );
       }
     }
 
-    // Return all scores for this shooter and stage, ordered by submitted_at desc
+    // 10. Return enriched payload reflecting the canonical mobile score card.
     const scores = db
       .prepare(`SELECT * FROM scores WHERE shooter_id = ? AND stage_id = ? ORDER BY submitted_at DESC, id DESC`)
       .all(shooter.id, stage.id);
 
-    res.status(200).json(ok({ scores, totalPoints, hitFactor }));
+    res.status(200).json(
+      ok({
+        score_id: scoreId,
+        status,
+        totals,
+        rows: normalizedRows.map((row) => ({
+          row_type: row.row_type,
+          row_no: row.row_no,
+          A: row.A,
+          C: row.C,
+          D: row.D,
+          M: row.M,
+          N: row.N,
+        })),
+        penalties: {
+          auto_pe: autoPe,
+          additional_pe: additionalPe,
+          total_pe: totalPe,
+          reasons: reasons.map((r) => ({
+            reason_code: r.reason_code,
+            reason_label: r.reason_label ?? r.reason_code,
+            count: r.count,
+            sort_order: r.sort_order ?? 0,
+          })),
+        },
+        total_time,
+        total_points: totalPoints,
+        hit_factor: hitFactor,
+        scores,
+      })
+    );
   } catch (err) {
     res.status(500).json(fail(String(err)));
   }
@@ -596,52 +712,82 @@ router.put('/score-card', (req: Request, res: Response) => {
     );
 
     const tx = db.transaction(() => {
-      db.prepare(
-        `INSERT INTO scores
-          (match_id, shooter_id, stage_id, total_time, a_hits, c_hits, d_hits, m_hits, n_hits, pe,
-           first_shot, fastest_split, status, review_state, review_submitted_at, total_points, hit_factor, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', NULL, ?, ?, datetime('now'))
-         ON CONFLICT(shooter_id, stage_id) DO UPDATE SET
-           total_time = excluded.total_time,
-           a_hits = excluded.a_hits,
-           c_hits = excluded.c_hits,
-           d_hits = excluded.d_hits,
-           m_hits = excluded.m_hits,
-           n_hits = excluded.n_hits,
-           pe = excluded.pe,
-           first_shot = excluded.first_shot,
-           fastest_split = excluded.fastest_split,
-           status = excluded.status,
-           review_state = 'draft',
-           review_submitted_at = NULL,
-           total_points = excluded.total_points,
-           hit_factor = excluded.hit_factor,
-           confirmed = 0,
-           updated_at = datetime('now')`
-      ).run(
-        matchId,
-        shooter_id,
-        stage_id,
-        normalizedTime,
-        agg.a,
-        agg.c,
-        agg.d,
-        agg.m,
-        cappedNs + agg.npm,
-        peCount,
-        first_shot ?? null,
-        fastest_split ?? null,
-        status,
-        totalPoints,
-        hitFactor
-      );
+      const existingDraft = db
+        .prepare(
+          `SELECT id
+           FROM scores
+           WHERE match_id = ? AND shooter_id = ? AND stage_id = ? AND review_state = 'draft'
+           ORDER BY updated_at DESC, id DESC
+           LIMIT 1`
+        )
+        .get(matchId, shooter_id, stage_id) as { id: number } | undefined;
 
-      const score = db
-        .prepare(`SELECT * FROM scores WHERE shooter_id = ? AND stage_id = ?`)
-        .get(shooter_id, stage_id) as ScoreRow;
+      let scoreId: number;
 
-      db.prepare(`DELETE FROM score_card_rows WHERE score_id = ?`).run(score.id);
-      db.prepare(`DELETE FROM score_penalties WHERE score_id = ?`).run(score.id);
+      if (existingDraft) {
+        scoreId = existingDraft.id;
+        db.prepare(
+          `UPDATE scores
+           SET total_time = ?,
+               a_hits = ?,
+               c_hits = ?,
+               d_hits = ?,
+               m_hits = ?,
+               n_hits = ?,
+               pe = ?,
+               first_shot = ?,
+               fastest_split = ?,
+               status = ?,
+               review_state = 'draft',
+               review_submitted_at = NULL,
+               total_points = ?,
+               hit_factor = ?,
+               confirmed = 0,
+               updated_at = datetime('now')
+           WHERE id = ?`
+        ).run(
+          normalizedTime,
+          agg.a,
+          agg.c,
+          agg.d,
+          agg.m,
+          cappedNs + agg.npm,
+          peCount,
+          first_shot ?? null,
+          fastest_split ?? null,
+          status,
+          totalPoints,
+          hitFactor,
+          scoreId
+        );
+      } else {
+        const insertResult = db.prepare(
+          `INSERT INTO scores
+            (match_id, shooter_id, stage_id, total_time, a_hits, c_hits, d_hits, m_hits, n_hits, pe,
+             first_shot, fastest_split, status, review_state, review_submitted_at, total_points, hit_factor, updated_at, submitted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', NULL, ?, ?, datetime('now'), datetime('now'))`
+        ).run(
+          matchId,
+          shooter_id,
+          stage_id,
+          normalizedTime,
+          agg.a,
+          agg.c,
+          agg.d,
+          agg.m,
+          cappedNs + agg.npm,
+          peCount,
+          first_shot ?? null,
+          fastest_split ?? null,
+          status,
+          totalPoints,
+          hitFactor
+        );
+        scoreId = Number(insertResult.lastInsertRowid);
+      }
+
+      db.prepare(`DELETE FROM score_card_rows WHERE score_id = ?`).run(scoreId);
+      db.prepare(`DELETE FROM score_penalties WHERE score_id = ?`).run(scoreId);
 
       const insertRow = db.prepare(
         `INSERT INTO score_card_rows
@@ -650,7 +796,7 @@ router.put('/score-card', (req: Request, res: Response) => {
       );
       for (const row of normalizedRows) {
         insertRow.run(
-          score.id,
+          scoreId,
           row.row_type,
           row.row_no,
           row.a_hits,
@@ -667,7 +813,7 @@ router.put('/score-card', (req: Request, res: Response) => {
          VALUES (?, ?, ?, ?, ?)`
       );
       for (const reason of penalty_reasons.filter((item) => item.count > 0)) {
-        insertPenalty.run(score.id, reason.reason_code, reason.reason_label, reason.count, reason.sort_order);
+        insertPenalty.run(scoreId, reason.reason_code, reason.reason_label, reason.count, reason.sort_order);
       }
     });
 

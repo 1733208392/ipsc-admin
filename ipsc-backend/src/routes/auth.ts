@@ -15,17 +15,20 @@ const router = Router();
 // POST /auth/login
 router.post('/login', (req: Request, res: Response) => {
   const username = String(req.body?.username ?? '').trim();
+  const mobile = String(req.body?.mobile ?? '').trim();
+  const account = String(req.body?.account ?? '').trim();
+  const loginId = username || mobile || account;
   const password = String(req.body?.password ?? '');
 
-  if (!username || !password) {
+  if (!loginId || !password) {
     res.status(400).json(fail('用户名和密码不能为空'));
     return;
   }
 
   try {
     const user = db
-      .prepare(`SELECT * FROM users WHERE username = ?`)
-      .get(username) as Express.User & { password_hash: string } | undefined;
+      .prepare(`SELECT * FROM users WHERE username = ? OR phone = ?`)
+      .get(loginId, loginId) as Express.User & { password_hash: string } | undefined;
 
     if (!user) {
       res.status(401).json(fail('用户名或密码错误'));

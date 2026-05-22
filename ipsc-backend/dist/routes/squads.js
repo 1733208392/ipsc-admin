@@ -138,7 +138,14 @@ export function getSquadQueue(req, res) {
             const shooters = db
                 .prepare(`SELECT sh.id, sh.name, sh.bib_number,
                   d.name AS division_name, d.code AS division_code,
-                  COUNT(DISTINCT sc.stage_id) AS stages_done
+                  COUNT(DISTINCT sc.stage_id) AS stages_done,
+                  CASE WHEN EXISTS (
+                    SELECT 1
+                    FROM scores sc_dq
+                    WHERE sc_dq.match_id = sh.match_id
+                      AND sc_dq.shooter_id = sh.id
+                      AND sc_dq.status = 'dq'
+                  ) THEN 1 ELSE 0 END AS is_dq
            FROM shooters sh
            JOIN divisions d ON sh.division_id = d.id
            LEFT JOIN scores sc ON sh.id = sc.shooter_id AND sc.review_state = 'submitted'
@@ -152,6 +159,7 @@ export function getSquadQueue(req, res) {
                 stages_total: totalStages,
                 shooters: shooters.map((s) => ({
                     ...s,
+                    is_dq: s.is_dq === 1,
                     status: s.stages_done === 0
                         ? 'waiting'
                         : s.stages_done >= totalStages

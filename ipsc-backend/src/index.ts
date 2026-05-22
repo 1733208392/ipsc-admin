@@ -2,8 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { authMiddleware } from './auth.js';
 
 import matchesRouter from './routes/matches.js';
+import authRouter from './routes/auth.js';
 import divisionsRouter, { updateDivision, deleteDivision } from './routes/divisions.js';
 import subDivisionsRouter, { updateSubDivision, deleteSubDivision } from './routes/sub-divisions.js';
 import stagesRouter, { updateStage, deleteStage } from './routes/stages.js';
@@ -23,8 +25,6 @@ import shootersRouter, {
 } from './routes/shooters.js';
 import scoresRouter, {
   getShooterScores,
-  confirmScore,
-  deleteScore,
 } from './routes/scores.js';
 import leaderboardRouter from './routes/leaderboard.js';
 import stageAttachmentsRouter from './routes/stage-attachments.js';
@@ -42,6 +42,12 @@ app.use('/uploads', express.static(uploadsDir));
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 const api = express.Router();
+
+// Auth
+api.use('/auth', authRouter);
+
+// All routes below require authentication.
+api.use(authMiddleware);
 
 // Matches
 api.use('/matches', matchesRouter);
@@ -86,8 +92,6 @@ api.delete('/shooters/:id', deleteShooter);
 // Scores
 api.use('/matches/:matchId/scores', scoresRouter);
 api.get('/shooters/:shooterId/scores', getShooterScores);
-api.put('/scores/:id/confirm', confirmScore);
-api.delete('/scores/:id', deleteScore);
 
 // Leaderboard
 api.use('/matches/:matchId/leaderboard', leaderboardRouter);

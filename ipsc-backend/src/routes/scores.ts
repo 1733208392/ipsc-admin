@@ -866,6 +866,103 @@ router.post('/score-card/submit', (req: Request, res: Response) => {
     res.status(500).json(fail(String(err)));
   }
 });
+
+// GET /matches/:matchId/scores/livestream/latest
+//
+// Returns the most recent submitted score card for the match, intended for the
+// livestream score-card page. Polled by the frontend; advances automatically
+// when a new iOS submission lands. Optional ?stage_id= narrows to a single stage.
+router.get('/livestream/latest', (req: Request, res: Response) => {
+  const matchId = Number(req.params['matchId']);
+  const stageIdParam = req.query['stage_id'];
+  const stageIdFilter = stageIdParam ? Number(stageIdParam) : undefined;
+
+  if (stageIdParam !== undefined && (!Number.isInteger(stageIdFilter) || (stageIdFilter as number) <= 0)) {
+    res.status(400).json(fail('stage_id must be a positive integer when provided'));
+    return;
+  }
+
+  try {
+    const match = db.prepare(`SELECT id FROM matches WHERE id = ?`).get(matchId);
+    if (!match) {
+      res.status(404).json(fail('Match not found'));
+      return;
+    }
+
+    const latest = (stageIdFilter
+      ? db
+          .prepare(
+            `SELECT id, shooter_id, stage_id
+             FROM scores
+             WHERE match_id = ? AND stage_id = ? AND review_state = 'submitted'
+             ORDER BY submitted_at DESC, id DESC
+             LIMIT 1`
+          )
+          .get(matchId, stageIdFilter)
+      : db
+          .prepare(
+            `SELECT id, shooter_id, stage_id
+             FROM scores
+             WHERE match_id = ? AND review_state = 'submitted'
+             ORDER BY submitted_at DESC, id DESC
+             LIMIT 1`
+          )
+          .get(matchId)) as { id: number; shooter_id: number; stage_id: number } | undefined;
+
+    if (!latest) {
+      res.json(ok(null));
+      return;
+    }
+
+    const payload = getScoreCardPayload(matchId, latest.shooter_id, latest.stage_id, latest.id);
+    if (!payload) {
+      res.json(ok(null));
+      return;
+    }
+
+    // Enrich shooter with division/category context for the broadcast view.
+    const extras = db
+      .prepare(
+        `SELECT
+           s.category_code,
+           s.region,
+           s.club,
+           d.id AS division_id,
+           d.code AS division_code,
+           d.name AS division_name
+         FROM shooters s
+         JOIN divisions d ON s.division_id = d.id
+         WHERE s.id = ?`
+      )
+      .get(latest.shooter_id) as
+      | {
+          category_code: string | null;
+          region: string | null;
+          club: string | null;
+          division_id: number;
+          division_code: string;
+          division_name: string;
+        }
+      | undefined;
+
+    res.json(
+      ok({
+        ...payload,
+        shooter: {
+          ...payload.shooter,
+          category_code: extras?.category_code ?? null,
+          region: extras?.region ?? null,
+          club: extras?.club ?? null,
+          division_code: extras?.division_code ?? null,
+          division_name: extras?.division_name ?? null,
+        },
+      })
+    );
+  } catch (err) {
+    res.status(500).json(fail(String(err)));
+  }
+});
+
 // GET /shooters/:shooterId/scores  (mounted separately)
 export function getShooterScores(req: Request, res: Response): void {
   const shooterId = Number(req.params['shooterId']);

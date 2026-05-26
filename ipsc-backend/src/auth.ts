@@ -136,6 +136,16 @@ export function hasClubPermission(req: Request, resourceClubId: number): boolean
 }
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
+  // Public livestream endpoints — no auth required
+  if (
+    req.method === 'GET' &&
+    (/^\/matches\/\d+\/scores\/livestream\/latest$/.test(req.path) ||
+      req.path === '/matches/livestream/active')
+  ) {
+    next();
+    return;
+  }
+
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) {
     res.status(401).json(fail('未登录'));

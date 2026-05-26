@@ -4,7 +4,8 @@ import { AppSidebar } from './AppSidebar'
 
 export function AppLayout() {
   const location = useLocation()
-  const isLivestreamRoute = location.pathname.includes('/leaderboard-live')
+  const isLivestreamRoute =
+    location.pathname.includes('/leaderboard-live') || location.pathname.includes('/score-card-live')
   const [isFullscreen, setIsFullscreen] = useState<boolean>(() => Boolean(document.fullscreenElement))
 
   useEffect(() => {

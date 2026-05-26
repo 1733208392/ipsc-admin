@@ -103,6 +103,28 @@ router.get('/', (req: Request, res: Response) => {
   }
 });
 
+// GET /matches/livestream/active — PUBLIC: returns most recent active match for livestream auto-follow
+router.get('/livestream/active', (_req: Request, res: Response) => {
+  try {
+    const match = db
+      .prepare(
+        `SELECT * FROM matches WHERE status = 'active' ORDER BY created_at DESC LIMIT 1`
+      )
+      .get();
+    if (!match) {
+      // fall back to most recently created match so the livestream is never empty
+      const fallback = db
+        .prepare(`SELECT * FROM matches ORDER BY created_at DESC LIMIT 1`)
+        .get();
+      res.json(ok(fallback ?? null));
+      return;
+    }
+    res.json(ok(match));
+  } catch (err) {
+    res.status(500).json(fail(String(err)));
+  }
+});
+
 // GET /matches/:id
 router.get('/:id', (req: Request, res: Response) => {
   const id = Number(req.params['id']);

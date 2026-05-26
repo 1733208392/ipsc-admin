@@ -28,6 +28,7 @@ import scoresRouter, {
 } from './routes/scores.js';
 import leaderboardRouter from './routes/leaderboard.js';
 import stageAttachmentsRouter from './routes/stage-attachments.js';
+import drillReplaysRouter, { getDrillReplay, deleteDrillReplay } from './routes/drill-replays.js';
 import { getUploadsDir } from './services/stage-files.js';
 
 const app = express();
@@ -95,6 +96,11 @@ api.get('/shooters/:shooterId/scores', getShooterScores);
 
 // Leaderboard
 api.use('/matches/:matchId/leaderboard', leaderboardRouter);
+// Drill Replays (raw shot data uploaded from iOS)
+api.use('/matches/:matchId/drill-replays', drillReplaysRouter);
+api.get('/drill-replays/:id', getDrillReplay);
+api.delete('/drill-replays/:id', deleteDrillReplay);
+
 
 app.use('/api/v1', api);
 

@@ -300,6 +300,27 @@ export type ScorePenaltyReasonInput = z.infer<typeof ScorePenaltyReasonSchema>;
 export type UpsertScoreCardInput = z.infer<typeof UpsertScoreCardSchema>;
 export type SubmitScoreCardInput = z.infer<typeof SubmitScoreCardSchema>;
 
+// ── Drill Replays ─────────────────────────────────────────────────────────────
+// Raw drill-replay payload uploaded by the iOS app. The full original shot
+// stream is preserved as-is in `payload` so the admin viewer can "rewind"
+// the run (hit area, hit position, target type/name, timing of shots).
+export const DrillReplayUploadSchema = z.object({
+  shooter_id: z.number().int().positive(),
+  stage_id: z.number().int().positive(),
+  drill_name: z.string().optional(),
+  total_time: z.number().min(0).optional().default(0),
+  num_shots: z.number().int().min(0).optional().default(0),
+  score: z.number().int().optional(),
+  client_drill_result_id: z.string().min(1).optional(),
+  device_id: z.string().optional(),
+  // Free-form raw payload; viewer will look up payload.shotData (iOS) or
+  // payload.shots. Keep flexible so iOS can evolve the shape without
+  // requiring backend changes.
+  payload: z.record(z.string(), z.unknown()),
+});
+
+export type DrillReplayUploadInput = z.infer<typeof DrillReplayUploadSchema>;
+
 // ── Unified response helpers ───────────────────────────────────────────────────
 export function ok<T>(data: T) {
   return { success: true, data } as const;

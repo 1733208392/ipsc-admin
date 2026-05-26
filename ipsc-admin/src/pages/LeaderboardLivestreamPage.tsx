@@ -36,8 +36,10 @@ export function LeaderboardLivestreamPage() {
   const [stages, setStages] = useState<Stage[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDivision, setSelectedDivision] = useState<string>('')
+  const [selectedStage, setSelectedStage] = useState<string>('')
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [autoRotate, setAutoRotate] = useState(true)
   const { setCurrentMatch } = useMatch()
   const { toast } = useToast()
 
@@ -52,6 +54,16 @@ export function LeaderboardLivestreamPage() {
     () => divisions.find((d) => String(d.id) === selectedDivision)?.name ?? 'No Division',
     [divisions, selectedDivision]
   )
+
+  const activeStageName = useMemo(
+    () => stages.find((s) => String(s.id) === selectedStage)?.name ?? '',
+    [stages, selectedStage]
+  )
+
+  const gridTemplate = useMemo(() => {
+    // Rank | Name | Time | Hit Factor | Percentage | Stage Points
+    return '110px 1.6fr 0.9fr 0.9fr 0.9fr 1.0fr'
+  }, [])
 
   async function load() {
     if (!matchId) return
@@ -68,10 +80,13 @@ export function LeaderboardLivestreamPage() {
         .filter((d) => supportedDivisionCodes.has(d.code))
       const sortedStages = [...stagesData].sort((a, b) => a.sort_order - b.sort_order)
       const effectiveDivision = selectedDivision || (visibleDivisions[0] ? String(visibleDivisions[0].id) : '')
-      const effectiveStage = sortedStages[0] ? String(sortedStages[0].id) : ''
+      const effectiveStage = selectedStage || (sortedStages[0] ? String(sortedStages[0].id) : '')
 
       if (effectiveDivision !== selectedDivision) {
         setSelectedDivision(effectiveDivision)
+      }
+      if (effectiveStage !== selectedStage) {
+        setSelectedStage(effectiveStage)
       }
 
       let nextRankings: LeaderboardEntry[] = []
@@ -102,11 +117,18 @@ export function LeaderboardLivestreamPage() {
   useEffect(() => {
     setLoading(true)
     void load()
-  }, [matchId, selectedDivision, selectedCategory])
+  }, [matchId, selectedDivision, selectedStage, selectedCategory])
 
+  // Auto-rotate: every 10s advance the stage; when the stage list wraps,
+  // advance to the next division. This cycles through every (division, stage)
+  // combination so the broadcast covers everything.
   useEffect(() => {
     if (switchIntervalRef.current) {
       clearInterval(switchIntervalRef.current)
+    }
+
+    if (!autoRotate) {
+      return
     }
 
     if (divisions.length <= 1) {
@@ -114,23 +136,17 @@ export function LeaderboardLivestreamPage() {
     }
 
     switchIntervalRef.current = setInterval(() => {
-      setSelectedDivision((current) => {
-        const currentIndex = divisions.findIndex((d) => String(d.id) === current)
-        if (currentIndex < 0) {
-          return String(divisions[0].id)
-        }
-
-        const nextIndex = (currentIndex + 1) % divisions.length
-        return String(divisions[nextIndex].id)
-      })
-    }, 10000)
+      const divIdx = divisions.findIndex((d) => String(d.id) === selectedDivision)
+      const nextDivIdx = divIdx < 0 ? 0 : (divIdx + 1) % divisions.length
+      setSelectedDivision(String(divisions[nextDivIdx].id))
+    }, 7000)
 
     return () => {
       if (switchIntervalRef.current) {
         clearInterval(switchIntervalRef.current)
       }
     }
-  }, [divisions])
+  }, [divisions, stages, selectedDivision, selectedStage, autoRotate])
 
   useEffect(() => {
     function handleFullscreenChange() {
@@ -189,10 +205,48 @@ export function LeaderboardLivestreamPage() {
               <span className="mx-2 text-red-600 md:mx-4">/</span>
               <span className="text-red-500">{activeCategoryLabel.toUpperCase()}</span>
             </h1>
-            <p className="ls-ui-font mt-2 text-[9px] font-semibold uppercase tracking-[0.34em] text-zinc-500 md:text-[11px]">
-              IPSC Shooting Game
+            <p className="ls-ui-font mt-2 text-[11px] font-semibold uppercase tracking-[0.34em] text-zinc-500 md:text-[14px]">
+              {activeStageName ? `Stage · ${activeStageName}` : 'IPSC Shooting Game'}
             </p>
           </div>
+
+          {stages.length > 0 && (
+            <div className="relative mt-6 flex flex-wrap justify-center gap-2 md:mt-8 md:gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setAutoRotate(true)}
+                className={`ls-ui-font h-9 min-w-20 rounded-none border px-4 text-[11px] font-bold uppercase tracking-[0.08em] [clip-path:polygon(7%_0,93%_0,100%_50%,93%_100%,7%_100%,0_50%)] md:min-w-28 md:text-base ${
+                  autoRotate
+                    ? 'border-red-500/90 bg-[linear-gradient(110deg,rgba(127,29,29,0.96),rgba(239,68,68,0.72))] text-zinc-100 shadow-[0_0_24px_rgba(239,68,68,0.35)]'
+                    : 'border-zinc-600 bg-zinc-900/70 text-zinc-300 hover:bg-zinc-800'
+                }`}
+              >
+                Auto
+              </Button>
+              {stages.map((s) => {
+                const active = !autoRotate && String(s.id) === selectedStage
+                return (
+                  <Button
+                    key={s.id}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setAutoRotate(false)
+                      setSelectedStage(String(s.id))
+                    }}
+                    className={`ls-ui-font h-9 min-w-20 rounded-none border px-4 text-[11px] font-bold uppercase tracking-[0.08em] [clip-path:polygon(7%_0,93%_0,100%_50%,93%_100%,7%_100%,0_50%)] md:min-w-28 md:text-base ${
+                      active
+                        ? 'border-red-500/90 bg-[linear-gradient(110deg,rgba(127,29,29,0.96),rgba(239,68,68,0.72))] text-zinc-100 shadow-[0_0_24px_rgba(239,68,68,0.35)]'
+                        : 'border-zinc-600 bg-zinc-900/70 text-zinc-300 hover:bg-zinc-800'
+                    }`}
+                  >
+                    {s.name}
+                  </Button>
+                )
+              })}
+            </div>
+          )}
 
           <div className="relative mt-10 flex flex-wrap justify-center gap-2 md:mt-12 md:gap-3">
             {categories.map((c) => (
@@ -225,7 +279,7 @@ export function LeaderboardLivestreamPage() {
           </div>
         ) : stages.length === 0 ? (
           <div className="mt-4 rounded-xl bg-black/35 p-10 text-center text-zinc-300">
-            No stage is available, so livestream leaderboard cannot be calculated.
+            No stages configured for this match.
           </div>
         ) : rankings.length === 0 ? (
           <div className="mt-4 rounded-xl bg-black/35 p-10 text-center text-zinc-300">
@@ -233,25 +287,30 @@ export function LeaderboardLivestreamPage() {
           </div>
         ) : (
           <div className="mt-4">
-            <div className="ls-ui-font grid grid-cols-[72px_1.2fr_0.8fr_0.8fr_1fr] items-center rounded-t-lg bg-black/35 px-3 py-3 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-300 md:grid-cols-[110px_1.4fr_1fr_1fr_1fr] md:px-6 md:text-[16px] md:tracking-[0.08em]">
+            <div
+              className="ls-ui-font grid items-center rounded-t-lg bg-black/35 px-3 py-3 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-300 md:px-6 md:text-[16px] md:tracking-[0.08em]"
+              style={{ gridTemplateColumns: gridTemplate }}
+            >
               <span>Rank</span>
               <span>Name</span>
-              <span className="text-right">HF</span>
+              <span className="text-right">Time</span>
+              <span className="text-right">Hit Factor</span>
               <span className="text-right">%</span>
-              <span className="text-right">Stage Points</span>
+              <span className="text-right text-red-400">Stage Pts</span>
             </div>
 
             <div className="space-y-3 p-2 md:p-4">
               {rankings.map((entry, idx) => {
-                const rank = entry.rank_in_stage ?? idx + 1
+                const rank = entry.rank_in_stage ?? entry.rank ?? idx + 1
                 const rowBackground = getAlternatingRowBackground(idx)
                 return (
                   <div
                     key={entry.id}
-                    className="relative bg-center bg-no-repeat px-3 py-3 text-white md:grid md:grid-cols-[110px_1.4fr_1fr_1fr_1fr] md:px-6 md:py-4"
+                    className="relative bg-center bg-no-repeat px-3 py-3 text-white md:grid md:px-6 md:py-4"
                     style={{
                       backgroundImage: `url(${rowBackground})`,
                       backgroundSize: '100% 100%',
+                      gridTemplateColumns: gridTemplate,
                     }}
                   >
                     <div className="relative grid grid-cols-[72px_1fr] items-center gap-2 md:block">
@@ -264,12 +323,15 @@ export function LeaderboardLivestreamPage() {
                       </div>
                     </div>
                     <div className="ls-number-font relative mt-2 text-right text-2xl font-black text-zinc-100 md:mt-0 md:text-[32px]">
-                      {formatNumeric(entry.hit_factor, 2)}
+                      {entry.total_time != null ? `${formatNumeric(entry.total_time, 2)}s` : '—'}
                     </div>
-                    <div className="ls-number-font relative text-right text-2xl font-black text-zinc-100 md:text-[32px]">
-                      {formatNumeric(entry.percentage, 1)}%
+                    <div className="ls-number-font relative mt-2 text-right text-2xl font-black text-zinc-100 md:mt-0 md:text-[32px]">
+                      {entry.hit_factor != null ? formatNumeric(entry.hit_factor, 4) : '—'}
                     </div>
-                    <div className="ls-number-font relative text-right text-2xl font-black text-zinc-100 md:text-[32px]">
+                    <div className="ls-number-font relative mt-2 text-right text-2xl font-black text-zinc-100 md:mt-0 md:text-[32px]">
+                      {entry.percentage != null ? `${formatNumeric(entry.percentage, 2)}%` : '—'}
+                    </div>
+                    <div className="ls-number-font relative mt-2 text-right text-2xl font-black text-red-400 md:mt-0 md:text-[32px]">
                       {formatNumeric(entry.stage_points_earned, 2)}
                     </div>
                   </div>

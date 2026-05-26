@@ -1,5 +1,5 @@
 import { NavLink, useParams } from 'react-router-dom'
-import { Target, List, Users, Layers, Group, Trophy, ClipboardList, LogOut, Building2, UserCog, Shield } from 'lucide-react'
+import { Target, List, Users, Layers, Group, Trophy, ClipboardList, LogOut, Building2, UserCog, Shield, Film } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMatch } from '@/hooks/useMatch'
 import { Separator } from '@/components/ui/separator'
@@ -90,6 +90,11 @@ export function AppSidebar({ collapsed = false }: { collapsed?: boolean }) {
               {!collapsed ? '评分卡' : null}
             </NavLink>
 
+            <NavLink to={`/matches/${matchId}/drill-replays`} className={navLinkClass}>
+              <Film className="h-4 w-4" />
+              {!collapsed ? '回放数据' : null}
+            </NavLink>
+
             <NavLink to={`/matches/${matchId}/leaderboard`} className={navLinkClass}>
               <Trophy className="h-4 w-4" />
               {!collapsed ? '积分榜' : null}
@@ -98,6 +103,11 @@ export function AppSidebar({ collapsed = false }: { collapsed?: boolean }) {
             <NavLink to={`/matches/${matchId}/leaderboard-live`} className={navLinkClass}>
               <Trophy className="h-4 w-4" />
               {!collapsed ? '直播榜' : null}
+            </NavLink>
+
+            <NavLink to={`/matches/${matchId}/score-card-live`} className={navLinkClass}>
+              <Trophy className="h-4 w-4" />
+              {!collapsed ? '直播评分卡' : null}
             </NavLink>
           </>
         )}

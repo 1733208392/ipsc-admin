@@ -1,0 +1,113 @@
+[gd_scene load_steps=3 format=3 uid="uid://b8m4xpsim2plnr"]
+
+[ext_resource type="Script" path="res://scripts/Planner.cs" id="1_planner"]
+[ext_resource type="Script" path="res://scripts/StageView.cs" id="2_view"]
+
+[node name="Planner" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 0
+script = ExtResource("1_planner")
+StageDropdownPath = NodePath("RightPanel/Margin/VBox/StageRow/StageDropdown")
+DivisionDropdownPath = NodePath("RightPanel/Margin/VBox/DivRow/DivDropdown")
+StepsListPath = NodePath("RightPanel/Margin/VBox/StepsList")
+HfLabelPath = NodePath("RightPanel/Margin/VBox/HfLabel")
+WarningsLabelPath = NodePath("RightPanel/Margin/VBox/WarningsLabel")
+SpeedSliderPath = NodePath("RightPanel/Margin/VBox/SpeedSlider")
+SpeedValueLabelPath = NodePath("RightPanel/Margin/VBox/SpeedValueLabel")
+ToolOptionPath = NodePath("RightPanel/Margin/VBox/ToolOption")
+UndoButtonPath = NodePath("RightPanel/Margin/VBox/Buttons/UndoButton")
+ClearButtonPath = NodePath("RightPanel/Margin/VBox/Buttons/ClearButton")
+RunButtonPath = NodePath("RightPanel/Margin/VBox/Buttons/RunButton")
+
+[node name="Background" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.07, 0.09, 0.12, 1)
+mouse_filter = 2
+
+[node name="World" type="Node2D" parent="."]
+
+[node name="StageView" type="Node2D" parent="World"]
+script = ExtResource("2_view")
+
+[node name="RightPanel" type="PanelContainer" parent="."]
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -340.0
+mouse_filter = 0
+
+[node name="Margin" type="MarginContainer" parent="RightPanel"]
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="RightPanel/Margin"]
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="RightPanel/Margin/VBox"]
+text = "IPSC Sim — Planner"
+
+[node name="StageRow" type="HBoxContainer" parent="RightPanel/Margin/VBox"]
+
+[node name="StageLabel" type="Label" parent="RightPanel/Margin/VBox/StageRow"]
+text = "Stage:"
+custom_minimum_size = Vector2(70, 0)
+
+[node name="StageDropdown" type="OptionButton" parent="RightPanel/Margin/VBox/StageRow"]
+size_flags_horizontal = 3
+
+[node name="DivRow" type="HBoxContainer" parent="RightPanel/Margin/VBox"]
+
+[node name="DivLabel" type="Label" parent="RightPanel/Margin/VBox/DivRow"]
+text = "Division:"
+custom_minimum_size = Vector2(70, 0)
+
+[node name="DivDropdown" type="OptionButton" parent="RightPanel/Margin/VBox/DivRow"]
+size_flags_horizontal = 3
+
+[node name="ToolLabel" type="Label" parent="RightPanel/Margin/VBox"]
+text = "Tool:"
+
+[node name="ToolOption" type="OptionButton" parent="RightPanel/Margin/VBox"]
+
+[node name="SpeedValueLabel" type="Label" parent="RightPanel/Margin/VBox"]
+text = "Speed: 0.50"
+
+[node name="SpeedSlider" type="HSlider" parent="RightPanel/Margin/VBox"]
+min_value = 0.0
+max_value = 1.0
+step = 0.05
+value = 0.5
+
+[node name="StepsLabel" type="Label" parent="RightPanel/Margin/VBox"]
+text = "Steps:"
+
+[node name="StepsList" type="ItemList" parent="RightPanel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 220)
+size_flags_vertical = 3
+auto_height = false
+
+[node name="HfLabel" type="Label" parent="RightPanel/Margin/VBox"]
+text = "HF: —"
+
+[node name="WarningsLabel" type="Label" parent="RightPanel/Margin/VBox"]
+text = ""
+autowrap_mode = 2
+
+[node name="Buttons" type="HBoxContainer" parent="RightPanel/Margin/VBox"]
+
+[node name="UndoButton" type="Button" parent="RightPanel/Margin/VBox/Buttons"]
+text = "Undo"
+size_flags_horizontal = 3
+
+[node name="ClearButton" type="Button" parent="RightPanel/Margin/VBox/Buttons"]
+text = "Clear"
+size_flags_horizontal = 3
+
+[node name="RunButton" type="Button" parent="RightPanel/Margin/VBox/Buttons"]
+text = "Run"
+size_flags_horizontal = 3

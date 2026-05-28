@@ -1,0 +1,21 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+.idea/
+
+# Godot
+.godot/
+.import/
+export.cfg
+export_presets.cfg.bak
+
+# Node
+node_modules/
+dist/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

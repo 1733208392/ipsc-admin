@@ -1,0 +1,21 @@
+{
+  "id": "field-course-24",
+  "name": "Field Course 24",
+  "boundsW": 20,
+  "boundsH": 24,
+  "minRounds": 24,
+  "startPose": { "x": 10, "y": 1, "facingDeg": 0 },
+  "targets": [
+    { "id": 1, "kind": "paperIpsc", "requiredHits": 2, "pose": { "x": 3, "y": 8 } },
+    { "id": 2, "kind": "paperIpsc", "requiredHits": 2, "pose": { "x": 5, "y": 9 } },
+    { "id": 3, "kind": "paperIpsc", "requiredHits": 2, "pose": { "x": 7, "y": 10 } },
+    { "id": 4, "kind": "noShoot",   "requiredHits": 0, "pose": { "x": 6, "y": 10 } },
+    { "id": 5, "kind": "popper",    "requiredHits": 1, "pose": { "x": 9, "y": 12 } },
+    { "id": 6, "kind": "popper",    "requiredHits": 1, "pose": { "x": 11, "y": 12 } },
+    { "id": 7, "kind": "paperIpsc", "requiredHits": 2, "pose": { "x": 13, "y": 13 } },
+    { "id": 8, "kind": "paperIpsc", "requiredHits": 2, "pose": { "x": 15, "y": 14 } },
+    { "id": 9, "kind": "paperIpsc", "requiredHits": 2, "pose": { "x": 17, "y": 15 } },
+    { "id": 10, "kind": "paperIpsc", "requiredHits": 2, "pose": { "x": 12, "y": 18 } },
+    { "id": 11, "kind": "paperIpsc", "requiredHits": 2, "pose": { "x": 8, "y": 19 } }
+  ]
+}

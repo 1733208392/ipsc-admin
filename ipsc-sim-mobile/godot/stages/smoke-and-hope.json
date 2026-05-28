@@ -1,0 +1,16 @@
+{
+  "id": "smoke-and-hope",
+  "name": "Smoke & Hope",
+  "boundsW": 8,
+  "boundsH": 10,
+  "minRounds": 6,
+  "startPose": { "x": 4, "y": 1, "facingDeg": 0 },
+  "targets": [
+    { "id": 1, "kind": "plate", "requiredHits": 1, "pose": { "x": 1.5, "y": 8 } },
+    { "id": 2, "kind": "plate", "requiredHits": 1, "pose": { "x": 2.5, "y": 8 } },
+    { "id": 3, "kind": "plate", "requiredHits": 1, "pose": { "x": 3.5, "y": 8 } },
+    { "id": 4, "kind": "plate", "requiredHits": 1, "pose": { "x": 4.5, "y": 8 } },
+    { "id": 5, "kind": "plate", "requiredHits": 1, "pose": { "x": 5.5, "y": 8 } },
+    { "id": 6, "kind": "plate", "requiredHits": 1, "pose": { "x": 6.5, "y": 8 } }
+  ]
+}

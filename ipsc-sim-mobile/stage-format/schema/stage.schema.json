@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IPSC Sim Stage",
+  "type": "object",
+  "required": ["id", "name", "boundsW", "boundsH", "startPose", "targets", "minRounds"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "boundsW": { "type": "number", "exclusiveMinimum": 0 },
+    "boundsH": { "type": "number", "exclusiveMinimum": 0 },
+    "minRounds": { "type": "integer", "minimum": 0 },
+    "startPose": { "$ref": "#/$defs/pose" },
+    "targets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/target" }
+    }
+  },
+  "$defs": {
+    "pose": {
+      "type": "object",
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "facingDeg": { "type": "number", "default": 0 }
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": ["id", "kind", "pose"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "kind": {
+          "type": "string",
+          "enum": ["paperIpsc", "popper", "miniPopper", "plate", "noShoot"]
+        },
+        "pose": { "$ref": "#/$defs/pose" },
+        "requiredHits": { "type": "integer", "minimum": 0, "default": 2 },
+        "activatorId": { "type": ["integer", "null"] },
+        "activationDelay": { "type": "number", "minimum": 0, "default": 0 }
+      }
+    }
+  }
+}

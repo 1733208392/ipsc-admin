@@ -213,6 +213,31 @@ router.patch('/:id/status', (req: Request, res: Response) => {
 });
 
 // DELETE /matches/:id
+// PATCH /matches/:id/active-squad
+router.patch('/:id/active-squad', (req: Request, res: Response) => {
+  const id = Number(req.params['id']);
+  const { active_squad_id } = req.body as { active_squad_id: number | null };
+  try {
+    const match = db.prepare(`SELECT * FROM matches WHERE id = ?`).get(id);
+    if (!match) {
+      res.status(404).json(fail('Match not found'));
+      return;
+    }
+    if (active_squad_id !== null) {
+      const squad = db.prepare(`SELECT id FROM squads WHERE id = ? AND match_id = ?`).get(active_squad_id, id);
+      if (!squad) {
+        res.status(400).json(fail('Squad not found in this match'));
+        return;
+      }
+    }
+    db.prepare(`UPDATE matches SET active_squad_id = ? WHERE id = ?`).run(active_squad_id, id);
+    const updated = db.prepare(`SELECT * FROM matches WHERE id = ?`).get(id);
+    res.json(ok(updated));
+  } catch (err) {
+    res.status(500).json(fail(String(err)));
+  }
+});
+
 export function deleteMatch(req: Request, res: Response): void {
   const id = Number(req.params['id']);
   try {

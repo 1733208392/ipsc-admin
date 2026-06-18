@@ -65,6 +65,7 @@ export function MatchList() {
   const [creatingSquad, setCreatingSquad] = useState(false)
   const [removingStageId, setRemovingStageId] = useState<number | null>(null)
   const [removingSquadId, setRemovingSquadId] = useState<number | null>(null)
+  const [activeSquadId, setActiveSquadId] = useState<Record<number, number | null>>({})
   const { setCurrentMatch } = useMatch()
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -78,6 +79,13 @@ export function MatchList() {
     try {
       const data = await api.get<Match[]>('/matches')
       setMatches(data)
+    const squadMap: Record<number, number | null> = {}
+    for (const m of data) {
+      if (m.active_squad_id !== undefined && m.active_squad_id !== null) {
+        squadMap[m.id] = m.active_squad_id
+      }
+    }
+    setActiveSquadId(squadMap)
     } catch (e) {
       toast({ title: '加载失败', description: String(e), variant: 'destructive' })
     } finally {
@@ -258,6 +266,17 @@ export function MatchList() {
     }
   }
 
+  async function onChangeActiveSquad(matchId: number, squadId: string) {
+    try {
+      const sid = squadId === 'none' ? null : Number(squadId)
+      await api.patch(`/matches/${matchId}/active-squad`, { active_squad_id: sid })
+      setActiveSquadId((prev) => ({ ...prev, [matchId]: sid }))
+      toast({ title: sid ? '活动小组已设置' : '活动小组已清除' })
+    } catch (e) {
+      toast({ title: '设置失败', description: String(e), variant: 'destructive' })
+    }
+  }
+
   async function onDeleteMatch() {
     if (!deleting) return
 
@@ -435,6 +454,25 @@ export function MatchList() {
                     ))}
                   </div>
                 )}
+              </div>
+
+              <div>
+                <p className="text-sm font-medium mb-3">当前活动小组</p>
+                <p className="text-xs text-muted-foreground mb-2">iOS 成绩提交时将自动归入此小组</p>
+                <Select
+                  value={String(activeSquadId[editing.id] ?? 'none')}
+                  onValueChange={(v) => { void onChangeActiveSquad(editing.id, v) }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择活动小组" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">未设置</SelectItem>
+                    {matchSquads.map((sq) => (
+                      <SelectItem key={sq.id} value={String(sq.id)}>{sq.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>

@@ -8,6 +8,7 @@ export interface Match {
   divisions_count?: number
   stages_count?: number
   squads_count?: number
+  active_squad_id?: number | null
   club_name?: string
   club_short_name?: string
 }
@@ -196,16 +197,6 @@ export interface ScoreCardDetail {
   penalty_reasons: ScorePenaltyReason[]
 }
 
-export interface LivestreamScoreCard extends ScoreCardDetail {
-  shooter: ScoreCardDetail['shooter'] & {
-    category_code: string | null
-    region: string | null
-    club: string | null
-    division_code: string | null
-    division_name: string | null
-  }
-}
-
 export interface LeaderboardEntry {
   rank?: number
   rank_in_stage?: number
@@ -253,63 +244,4 @@ export interface LeaderboardResponse {
     stage_points: number
   }
   rankings: LeaderboardEntry[]
-}
-
-// ── Drill Replays ──────────────────────────────────────────────────────────────
-
-export interface ShotPosition {
-  x: number
-  y: number
-}
-
-export interface ShotContent {
-  command?: string
-  hitArea?: string
-  hitPosition?: ShotPosition
-  targetType?: string
-  timeDiff?: number
-  device?: string
-}
-
-export interface ShotData {
-  target?: string | null
-  content: ShotContent
-  type?: string
-  action?: string | null
-  device?: string | null
-}
-
-export interface DrillReplayPayload {
-  drillName?: string
-  score?: number
-  factor?: number
-  totalTime?: number
-  numShots?: number
-  fastest?: number
-  firstShot?: number
-  shotData?: ShotData[]
-  hitZones?: Record<string, number> | null
-  athleteName?: string | null
-  athleteClub?: string | null
-}
-
-export interface DrillReplaySummary {
-  id: number
-  match_id: number
-  shooter_id: number
-  shooter_name: string | null
-  stage_id: number
-  stage_name: string | null
-  drill_name: string | null
-  total_time: number
-  num_shots: number
-  score: number | null
-  created_at: string
-}
-
-export interface DrillReplayDetail extends DrillReplaySummary {
-  client_drill_result_id: string | null
-  device_id: string | null
-  uploaded_by: number | null
-  payload: DrillReplayPayload | null
 }

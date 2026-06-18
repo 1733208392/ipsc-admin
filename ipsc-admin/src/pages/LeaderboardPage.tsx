@@ -32,7 +32,7 @@ function LeaderboardTable({
     return <div className="text-center py-12 text-muted-foreground">暂无数据</div>
   }
 
-  const isStageMode = selectedStage !== 'all'
+  const isStageMode = selectedStage !== ''
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
 
   const stageNameMap = useMemo(() => {
@@ -179,8 +179,8 @@ export function LeaderboardPage() {
 
       const sortedDivs = divsData.sort((a, b) => a.sort_order - b.sort_order)
       const sortedStages = stagesData.sort((a, b) => a.sort_order - b.sort_order)
-      const effectiveDivision = selectedDivision || (sortedDivs[0] ? String(sortedDivs[0].id) : '')
-      const effectiveStage = selectedStage || (sortedStages[0] ? String(sortedStages[0].id) : '')
+      const effectiveDivision = selectedDivision
+      const effectiveStage = selectedStage
 
       if (effectiveDivision && effectiveDivision !== selectedDivision) {
         setSelectedDivision(effectiveDivision)
@@ -196,9 +196,7 @@ export function LeaderboardPage() {
       const qs = params.toString()
       const url = `/matches/${matchId}/leaderboard${qs ? `?${qs}` : ''}`
 
-      const leaderboardResp = effectiveDivision && effectiveStage
-        ? await api.get<LeaderboardResponse>(url)
-        : { rankings: [] as LeaderboardEntry[] }
+      const leaderboardResp = await api.get<LeaderboardResponse>(url)
 
       setRankings(leaderboardResp.rankings)
       setDivisions(sortedDivs)
@@ -239,6 +237,13 @@ export function LeaderboardPage() {
         <>
           {/* Division Filter Row */}
           <div className="flex gap-1 flex-wrap mb-4">
+            <Button
+              variant={!selectedDivision ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedDivision("")}
+            >
+              全部
+            </Button>
             {divisions.map(d => (
               <Button
                 key={d.id}
@@ -267,6 +272,13 @@ export function LeaderboardPage() {
 
           {/* Stage Filter Row */}
           <div className="flex gap-1 flex-wrap mb-4">
+            <Button
+              variant={!selectedStage ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setSelectedStage("")}
+            >
+              全部
+            </Button>
             {stages.map(s => (
               <Button
                 key={s.id}

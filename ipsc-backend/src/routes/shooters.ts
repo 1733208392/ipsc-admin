@@ -27,7 +27,7 @@ router.post('/', (req: Request, res: Response) => {
     return;
   }
   try {
-    const { division_id, squad_id, shooter_uid, name, bib_number, category_code, age, gender, region, club } = parsed.data;
+    const { division_id, squad_id, shooter_uid, name, bib_number, category_code, age, gender, region, club, class: shooter_class, factor, failed_factor, disqualified_at, absent_at, membership_type } = parsed.data;
 
     let resolvedName = name;
     let resolvedAge = age;
@@ -65,6 +65,13 @@ router.post('/', (req: Request, res: Response) => {
       resolvedClub = resolvedClub ?? defaultClub?.short_name;
     }
 
+    // Auto-generate bib_number if not provided
+    let resolvedBib = bib_number;
+    if (!resolvedBib) {
+      const maxBib = db.prepare(`SELECT MAX(CAST(bib_number AS INTEGER)) as max_bib FROM shooters WHERE match_id = ?`).get(matchId) as { max_bib: number | null } | undefined;
+      resolvedBib = String((maxBib?.max_bib ?? 0) + 1).padStart(3, '0');
+    }
+
     if (!resolvedName) {
       res.status(400).json(fail('Name is required when shooter_uid is not provided'));
       return;
@@ -72,8 +79,8 @@ router.post('/', (req: Request, res: Response) => {
 
     const result = db
       .prepare(
-        `INSERT INTO shooters (match_id, division_id, squad_id, shooter_uid, name, bib_number, category_code, age, gender, region, club, club_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO shooters (match_id, division_id, squad_id, shooter_uid, name, bib_number, category_code, age, gender, region, club, club_id, "class", factor, failed_factor, disqualified_at, absent_at, membership_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         matchId,
@@ -81,13 +88,13 @@ router.post('/', (req: Request, res: Response) => {
         squad_id ?? null,
         shooter_uid ?? null,
         resolvedName,
-        bib_number,
+        resolvedBib,
         category_code ?? null,
         resolvedAge ?? null,
         resolvedGender ?? null,
         resolvedRegion ?? null,
         resolvedClub ?? null,
-        match.club_id
+        match.club_id, shooter_class ?? null, factor ?? null, failed_factor ?? null, disqualified_at ?? null, absent_at ?? null, membership_type ?? null
       );
     const shooter = db.prepare(`SELECT * FROM shooters WHERE id = ?`).get(result.lastInsertRowid);
     res.status(201).json(ok(shooter));
@@ -161,10 +168,10 @@ export function updateShooter(req: Request, res: Response): void {
     }
     const fields: string[] = [];
     const values: unknown[] = [];
-    const { division_id, squad_id, shooter_uid, name, bib_number, category_code, age, gender, region, club } = parsed.data;
+    const { division_id, squad_id, shooter_uid, name, bib_number, category_code, age, gender, region, club, class: shooter_class, factor, failed_factor, disqualified_at, absent_at, membership_type } = parsed.data;
     if (division_id !== undefined) { fields.push('division_id = ?'); values.push(division_id); }
     if (squad_id !== undefined) { fields.push('squad_id = ?'); values.push(squad_id); }
-    if (shooter_uid !== undefined) { fields.push('shooter_uid = ?'); values.push(shooter_uid); }
+    if (shooter_uid !== undefined && shooter_uid !== '') { fields.push('shooter_uid = ?'); values.push(shooter_uid); }
     if (name !== undefined) { fields.push('name = ?'); values.push(name); }
     if (bib_number !== undefined) { fields.push('bib_number = ?'); values.push(bib_number); }
     if (category_code !== undefined) { fields.push('category_code = ?'); values.push(category_code); }
@@ -172,6 +179,7 @@ export function updateShooter(req: Request, res: Response): void {
     if (gender !== undefined) { fields.push('gender = ?'); values.push(gender); }
     if (region !== undefined) { fields.push('region = ?'); values.push(region); }
     if (club !== undefined) { fields.push('club = ?'); values.push(club); }
+    if (membership_type !== undefined) { fields.push('membership_type = ?'); values.push(membership_type); }
     if (fields.length === 0) {
       res.json(ok(shooter));
       return;

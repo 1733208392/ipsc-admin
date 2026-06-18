@@ -16,10 +16,10 @@ router.post('/', (req, res) => {
         return;
     }
     try {
-        const { code, name, sort_order } = parsed.data;
+        const { code, name, power_factor, sort_order } = parsed.data;
         const result = db
-            .prepare(`INSERT INTO divisions (match_id, code, name, sort_order) VALUES (?, ?, ?, ?)`)
-            .run(matchId, code, name, sort_order);
+            .prepare(`INSERT INTO divisions (match_id, code, name, power_factor, sort_order) VALUES (?, ?, ?, ?, ?)`)
+            .run(matchId, code, name, power_factor, sort_order);
         const division = db.prepare(`SELECT * FROM divisions WHERE id = ?`).get(result.lastInsertRowid);
         res.status(201).json(ok(division));
     }

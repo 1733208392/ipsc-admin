@@ -143,7 +143,7 @@ function sumPenaltyReasons(penalties) {
     return penalties.reduce((sum, item) => sum + item.count, 0);
 }
 function countAutoUnengagedPE(rows) {
-    return rows.filter((row) => row.row_type === 'paper' && row.a_hits + row.c_hits + row.d_hits === 0).length;
+    return rows.filter((row) => row.row_type === 'paper' && row.a_hits + row.c_hits + row.d_hits + row.m_hits === 0).length;
 }
 function getScoreCardPayload(matchId, shooterId, stageId, scoreId) {
     const shooter = db
@@ -252,7 +252,7 @@ router.post('/flextarget', (req, res) => {
     }
     const { shooter_bib, stage_id, total_time, status, rows: perTargetRows, penalties, first_shot, fastest_split, } = parsed.data;
     try {
-        // 1. Find shooter by bib number in this match
+        // Find shooter by match_id + bib_number (bib is globally unique per match)
         const shooter = db
             .prepare(`SELECT * FROM shooters WHERE match_id = ? AND bib_number = ?`)
             .get(matchId, String(shooter_bib));
@@ -307,7 +307,7 @@ router.post('/flextarget', (req, res) => {
             N: acc.N + row.N,
         }), { A: 0, C: 0, D: 0, M: 0, N: 0 });
         // 5. Penalties: auto PE for unengaged paper targets + RO-added PE.
-        const autoPe = normalizedRows.filter((row) => row.row_type === 'paper' && row.A + row.C + row.D === 0).length;
+        const autoPe = normalizedRows.filter((row) => row.row_type === 'paper' && row.A + row.C + row.D + row.M === 0).length;
         const reasons = penalties.reasons ?? [];
         const reasonsSum = reasons.reduce((sum, r) => sum + r.count, 0);
         const additionalPe = penalties.additional_pe
@@ -600,6 +600,78 @@ router.post('/score-card/submit', (req, res) => {
         // Return updated payload (all scores for this shooter/stage)
         const payload = getScoreCardPayload(matchId, shooter_id, stage_id);
         res.json(ok(payload));
+    }
+    catch (err) {
+        res.status(500).json(fail(String(err)));
+    }
+});
+// GET /matches/:matchId/scores/livestream/latest
+//
+// Returns the most recent submitted score card for the match, intended for the
+// livestream score-card page. Polled by the frontend; advances automatically
+// when a new iOS submission lands. Optional ?stage_id= narrows to a single stage.
+router.get('/livestream/latest', (req, res) => {
+    const matchId = Number(req.params['matchId']);
+    const stageIdParam = req.query['stage_id'];
+    const stageIdFilter = stageIdParam ? Number(stageIdParam) : undefined;
+    if (stageIdParam !== undefined && (!Number.isInteger(stageIdFilter) || stageIdFilter <= 0)) {
+        res.status(400).json(fail('stage_id must be a positive integer when provided'));
+        return;
+    }
+    try {
+        const match = db.prepare(`SELECT id FROM matches WHERE id = ?`).get(matchId);
+        if (!match) {
+            res.status(404).json(fail('Match not found'));
+            return;
+        }
+        const latest = (stageIdFilter
+            ? db
+                .prepare(`SELECT id, shooter_id, stage_id
+             FROM scores
+             WHERE match_id = ? AND stage_id = ? AND review_state = 'submitted'
+             ORDER BY submitted_at DESC, id DESC
+             LIMIT 1`)
+                .get(matchId, stageIdFilter)
+            : db
+                .prepare(`SELECT id, shooter_id, stage_id
+             FROM scores
+             WHERE match_id = ? AND review_state = 'submitted'
+             ORDER BY submitted_at DESC, id DESC
+             LIMIT 1`)
+                .get(matchId));
+        if (!latest) {
+            res.json(ok(null));
+            return;
+        }
+        const payload = getScoreCardPayload(matchId, latest.shooter_id, latest.stage_id, latest.id);
+        if (!payload) {
+            res.json(ok(null));
+            return;
+        }
+        // Enrich shooter with division/category context for the broadcast view.
+        const extras = db
+            .prepare(`SELECT
+           s.category_code,
+           s.region,
+           s.club,
+           d.id AS division_id,
+           d.code AS division_code,
+           d.name AS division_name
+         FROM shooters s
+         JOIN divisions d ON s.division_id = d.id
+         WHERE s.id = ?`)
+            .get(latest.shooter_id);
+        res.json(ok({
+            ...payload,
+            shooter: {
+                ...payload.shooter,
+                category_code: extras?.category_code ?? null,
+                region: extras?.region ?? null,
+                club: extras?.club ?? null,
+                division_code: extras?.division_code ?? null,
+                division_name: extras?.division_name ?? null,
+            },
+        }));
     }
     catch (err) {
         res.status(500).json(fail(String(err)));

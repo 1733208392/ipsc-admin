@@ -23,6 +23,7 @@ export const VALID_DIVISION_CODES = ['production', 'optics', 'open', 'standard',
 export const CreateDivisionSchema = z.object({
   code: z.enum(VALID_DIVISION_CODES),
   name: z.string().min(1),
+  power_factor: z.enum(['major', 'minor']).optional().default('major'),
   sort_order: z.number().int().optional().default(0),
 });
 
@@ -80,26 +81,13 @@ export const UpdateSquadSchema = z.object({
   sort_order: z.number().int().optional(),
 });
 
-export const VALID_SHOOTER_CATEGORY_CODES = ['J', 'S', 'SJ', 'L'] as const;
+export const VALID_SHOOTER_CATEGORY_CODES = ['J','S','SJ','L','GJ'] as const;
+export const VALID_MEMBERSHIP_TYPES = ['member','coach','trial','vip','staff'] as const;
 
-// ── Shooters ──────────────────────────────────────────────────────────────────
 export const CreateShooterSchema = z.object({
   division_id: z.number().int().positive(),
   squad_id: z.number().int().positive().optional(),
-  shooter_uid: z.string().min(1).optional(),
-  name: z.string().min(1).optional(),
-  bib_number: z.string().min(1),
-  category_code: z.enum(VALID_SHOOTER_CATEGORY_CODES).optional(),
-  age: z.number().int().min(0).max(120).optional(),
-  gender: z.enum(['male', 'female']).optional(),
-  region: z.string().max(50).optional(),
-  club: z.string().max(100).optional(),
-});
-
-export const UpdateShooterSchema = z.object({
-  division_id: z.number().int().positive().optional(),
-  squad_id: z.number().int().positive().optional(),
-  shooter_uid: z.string().min(1).optional(),
+  shooter_uid: z.string().min(0).optional(),
   name: z.string().min(1).optional(),
   bib_number: z.string().min(1).optional(),
   category_code: z.enum(VALID_SHOOTER_CATEGORY_CODES).optional(),
@@ -107,6 +95,31 @@ export const UpdateShooterSchema = z.object({
   gender: z.enum(['male', 'female']).optional(),
   region: z.string().max(50).optional(),
   club: z.string().max(100).optional(),
+  class: z.string().max(10).optional(),
+  factor: z.enum(['Minor','Major']).optional(),
+  failed_factor: z.boolean().optional(),
+  disqualified_at: z.string().datetime().optional(),
+  absent_at: z.string().datetime().optional(),
+  membership_type: z.enum(VALID_MEMBERSHIP_TYPES).optional(),
+});
+
+export const UpdateShooterSchema = z.object({
+  division_id: z.number().int().positive().optional(),
+  squad_id: z.number().int().positive().optional(),
+  shooter_uid: z.string().min(0).optional(),
+  name: z.string().min(1).optional(),
+  bib_number: z.string().min(1).optional(),
+  category_code: z.enum(VALID_SHOOTER_CATEGORY_CODES).optional(),
+  age: z.number().int().min(0).max(120).optional(),
+  gender: z.enum(['male', 'female']).optional(),
+  region: z.string().max(50).optional(),
+  club: z.string().max(100).optional(),
+  class: z.string().max(10).optional(),
+  factor: z.enum(['Minor','Major']).optional(),
+  failed_factor: z.boolean().optional(),
+  disqualified_at: z.string().datetime().optional(),
+  absent_at: z.string().datetime().optional(),
+  membership_type: z.enum(VALID_MEMBERSHIP_TYPES).optional(),
 });
 
 // ── Auth / Accounts ──────────────────────────────────────────────────────────

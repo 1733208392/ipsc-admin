@@ -74,6 +74,26 @@ router.get('/', (req, res) => {
         res.status(500).json(fail(String(err)));
     }
 });
+// GET /matches/livestream/active — PUBLIC: returns most recent active match for livestream auto-follow
+router.get('/livestream/active', (_req, res) => {
+    try {
+        const match = db
+            .prepare(`SELECT * FROM matches WHERE status = 'active' ORDER BY created_at DESC LIMIT 1`)
+            .get();
+        if (!match) {
+            // fall back to most recently created match so the livestream is never empty
+            const fallback = db
+                .prepare(`SELECT * FROM matches ORDER BY created_at DESC LIMIT 1`)
+                .get();
+            res.json(ok(fallback ?? null));
+            return;
+        }
+        res.json(ok(match));
+    }
+    catch (err) {
+        res.status(500).json(fail(String(err)));
+    }
+});
 // GET /matches/:id
 router.get('/:id', (req, res) => {
     const id = Number(req.params['id']);
@@ -160,6 +180,31 @@ router.patch('/:id/status', (req, res) => {
     }
 });
 // DELETE /matches/:id
+// PATCH /matches/:id/active-squad
+router.patch('/:id/active-squad', (req, res) => {
+    const id = Number(req.params['id']);
+    const { active_squad_id } = req.body;
+    try {
+        const match = db.prepare(`SELECT * FROM matches WHERE id = ?`).get(id);
+        if (!match) {
+            res.status(404).json(fail('Match not found'));
+            return;
+        }
+        if (active_squad_id !== null) {
+            const squad = db.prepare(`SELECT id FROM squads WHERE id = ? AND match_id = ?`).get(active_squad_id, id);
+            if (!squad) {
+                res.status(400).json(fail('Squad not found in this match'));
+                return;
+            }
+        }
+        db.prepare(`UPDATE matches SET active_squad_id = ? WHERE id = ?`).run(active_squad_id, id);
+        const updated = db.prepare(`SELECT * FROM matches WHERE id = ?`).get(id);
+        res.json(ok(updated));
+    }
+    catch (err) {
+        res.status(500).json(fail(String(err)));
+    }
+});
 export function deleteMatch(req, res) {
     const id = Number(req.params['id']);
     try {

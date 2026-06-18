@@ -227,7 +227,7 @@ function sumPenaltyReasons(penalties: ScorePenaltyReasonInput[]): number {
 
 function countAutoUnengagedPE(rows: ScoreCardRowInput[]): number {
   return rows.filter(
-    (row) => row.row_type === 'paper' && row.a_hits + row.c_hits + row.d_hits === 0
+    (row) => row.row_type === 'paper' && row.a_hits + row.c_hits + row.d_hits + row.m_hits === 0
   ).length;
 }
 
@@ -359,7 +359,7 @@ router.post('/flextarget', (req: Request, res: Response) => {
   } = parsed.data;
 
   try {
-    // 1. Find shooter by bib number in this match
+    // Find shooter by match_id + bib_number (bib is globally unique per match)
     const shooter = db
       .prepare(`SELECT * FROM shooters WHERE match_id = ? AND bib_number = ?`)
       .get(matchId, String(shooter_bib)) as Shooter | undefined;
@@ -423,7 +423,7 @@ router.post('/flextarget', (req: Request, res: Response) => {
 
     // 5. Penalties: auto PE for unengaged paper targets + RO-added PE.
     const autoPe = normalizedRows.filter(
-      (row) => row.row_type === 'paper' && row.A + row.C + row.D === 0
+      (row) => row.row_type === 'paper' && row.A + row.C + row.D + row.M === 0
     ).length;
     const reasons = penalties.reasons ?? [];
     const reasonsSum = reasons.reduce((sum, r) => sum + r.count, 0);

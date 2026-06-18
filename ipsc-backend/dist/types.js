@@ -18,6 +18,7 @@ export const VALID_DIVISION_CODES = ['production', 'optics', 'open', 'standard',
 export const CreateDivisionSchema = z.object({
     code: z.enum(VALID_DIVISION_CODES),
     name: z.string().min(1),
+    power_factor: z.enum(['major', 'minor']).optional().default('major'),
     sort_order: z.number().int().optional().default(0),
 });
 export const UpdateDivisionSchema = z.object({
@@ -67,24 +68,12 @@ export const UpdateSquadSchema = z.object({
     name: z.string().min(1).optional(),
     sort_order: z.number().int().optional(),
 });
-export const VALID_SHOOTER_CATEGORY_CODES = ['J', 'S', 'SJ', 'L'];
-// ── Shooters ──────────────────────────────────────────────────────────────────
+export const VALID_SHOOTER_CATEGORY_CODES = ['J', 'S', 'SJ', 'L', 'GJ'];
+export const VALID_MEMBERSHIP_TYPES = ['member', 'coach', 'trial', 'vip', 'staff'];
 export const CreateShooterSchema = z.object({
     division_id: z.number().int().positive(),
     squad_id: z.number().int().positive().optional(),
-    shooter_uid: z.string().min(1).optional(),
-    name: z.string().min(1).optional(),
-    bib_number: z.string().min(1),
-    category_code: z.enum(VALID_SHOOTER_CATEGORY_CODES).optional(),
-    age: z.number().int().min(0).max(120).optional(),
-    gender: z.enum(['male', 'female']).optional(),
-    region: z.string().max(50).optional(),
-    club: z.string().max(100).optional(),
-});
-export const UpdateShooterSchema = z.object({
-    division_id: z.number().int().positive().optional(),
-    squad_id: z.number().int().positive().optional(),
-    shooter_uid: z.string().min(1).optional(),
+    shooter_uid: z.string().min(0).optional(),
     name: z.string().min(1).optional(),
     bib_number: z.string().min(1).optional(),
     category_code: z.enum(VALID_SHOOTER_CATEGORY_CODES).optional(),
@@ -92,6 +81,30 @@ export const UpdateShooterSchema = z.object({
     gender: z.enum(['male', 'female']).optional(),
     region: z.string().max(50).optional(),
     club: z.string().max(100).optional(),
+    class: z.string().max(10).optional(),
+    factor: z.enum(['Minor', 'Major']).optional(),
+    failed_factor: z.boolean().optional(),
+    disqualified_at: z.string().datetime().optional(),
+    absent_at: z.string().datetime().optional(),
+    membership_type: z.enum(VALID_MEMBERSHIP_TYPES).optional(),
+});
+export const UpdateShooterSchema = z.object({
+    division_id: z.number().int().positive().optional(),
+    squad_id: z.number().int().positive().optional(),
+    shooter_uid: z.string().min(0).optional(),
+    name: z.string().min(1).optional(),
+    bib_number: z.string().min(1).optional(),
+    category_code: z.enum(VALID_SHOOTER_CATEGORY_CODES).optional(),
+    age: z.number().int().min(0).max(120).optional(),
+    gender: z.enum(['male', 'female']).optional(),
+    region: z.string().max(50).optional(),
+    club: z.string().max(100).optional(),
+    class: z.string().max(10).optional(),
+    factor: z.enum(['Minor', 'Major']).optional(),
+    failed_factor: z.boolean().optional(),
+    disqualified_at: z.string().datetime().optional(),
+    absent_at: z.string().datetime().optional(),
+    membership_type: z.enum(VALID_MEMBERSHIP_TYPES).optional(),
 });
 // ── Auth / Accounts ──────────────────────────────────────────────────────────
 export const CreateClubSchema = z.object({
@@ -232,6 +245,24 @@ export const UpsertScoreCardSchema = z.object({
 export const SubmitScoreCardSchema = z.object({
     shooter_id: z.number().int().positive(),
     stage_id: z.number().int().positive(),
+});
+// ── Drill Replays ─────────────────────────────────────────────────────────────
+// Raw drill-replay payload uploaded by the iOS app. The full original shot
+// stream is preserved as-is in `payload` so the admin viewer can "rewind"
+// the run (hit area, hit position, target type/name, timing of shots).
+export const DrillReplayUploadSchema = z.object({
+    shooter_id: z.number().int().positive(),
+    stage_id: z.number().int().positive(),
+    drill_name: z.string().optional(),
+    total_time: z.number().min(0).optional().default(0),
+    num_shots: z.number().int().min(0).optional().default(0),
+    score: z.number().int().optional(),
+    client_drill_result_id: z.string().min(1).optional(),
+    device_id: z.string().optional(),
+    // Free-form raw payload; viewer will look up payload.shotData (iOS) or
+    // payload.shots. Keep flexible so iOS can evolve the shape without
+    // requiring backend changes.
+    payload: z.record(z.string(), z.unknown()),
 });
 // ── Unified response helpers ───────────────────────────────────────────────────
 export function ok(data) {

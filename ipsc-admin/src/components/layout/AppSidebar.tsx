@@ -1,5 +1,5 @@
 import { NavLink, useParams } from 'react-router-dom'
-import { Target, List, Users, Layers, Group, Trophy, ClipboardList, LogOut, Building2, UserCog, Shield, Film } from 'lucide-react'
+import { Target, List, Users, Layers, Group, Trophy, ClipboardList, LogOut, Building2, UserCog, Shield, FileText, FileCheck, Activity, Radio } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMatch } from '@/hooks/useMatch'
 import { Separator } from '@/components/ui/separator'
@@ -66,7 +66,7 @@ export function AppSidebar({ collapsed = false }: { collapsed?: boolean }) {
             </NavLink>
 
             <NavLink to={`/matches/${matchId}/stages`} className={navLinkClass}>
-              <ClipboardList className="h-4 w-4" />
+              <Target className="h-4 w-4" />
               {!collapsed ? 'Stage' : null}
             </NavLink>
 
@@ -81,18 +81,13 @@ export function AppSidebar({ collapsed = false }: { collapsed?: boolean }) {
             </NavLink>
 
             <NavLink to={`/matches/${matchId}/scores`} className={navLinkClass}>
-              <ClipboardList className="h-4 w-4" />
+              <FileText className="h-4 w-4" />
               {!collapsed ? '成绩' : null}
             </NavLink>
 
             <NavLink to={`/matches/${matchId}/score-card`} className={navLinkClass}>
-              <ClipboardList className="h-4 w-4" />
+              <FileCheck className="h-4 w-4" />
               {!collapsed ? '评分卡' : null}
-            </NavLink>
-
-            <NavLink to={`/matches/${matchId}/drill-replays`} className={navLinkClass}>
-              <Film className="h-4 w-4" />
-              {!collapsed ? '回放数据' : null}
             </NavLink>
 
             <NavLink to={`/matches/${matchId}/leaderboard`} className={navLinkClass}>
@@ -100,14 +95,13 @@ export function AppSidebar({ collapsed = false }: { collapsed?: boolean }) {
               {!collapsed ? '积分榜' : null}
             </NavLink>
 
-            <NavLink to={`/matches/${matchId}/leaderboard-live`} className={navLinkClass}>
-              <Trophy className="h-4 w-4" />
-              {!collapsed ? '直播榜' : null}
-            </NavLink>
-
             <NavLink to={`/matches/${matchId}/score-card-live`} className={navLinkClass}>
-              <Trophy className="h-4 w-4" />
-              {!collapsed ? '直播评分卡' : null}
+              <Activity className='h-4 w-4' />
+              {!collapsed ? '实时成绩' : null}
+            </NavLink>
+            <NavLink to={`/matches/${matchId}/leaderboard-live`} className={navLinkClass}>
+              <Radio className="h-4 w-4" />
+              {!collapsed ? '直播榜' : null}
             </NavLink>
           </>
         )}

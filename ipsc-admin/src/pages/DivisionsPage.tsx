@@ -47,9 +47,9 @@ export function DivisionsPage() {
   const { setCurrentMatch } = useMatch()
   const { toast } = useToast()
 
-  const { register: registerDivision, handleSubmit: handleDivisionSubmit, reset: resetDivision, formState: { errors: divisionErrors, isSubmitting: divisionSubmitting } } = useForm<DivisionFormData>({
-    resolver: zodResolver(divisionSchema) as Resolver<DivisionFormData>,
-    defaultValues: { sort_order: 0 },
+  const { register: registerDivision, handleSubmit: handleDivisionSubmit, reset: resetDivision, setValue: setDivisionValue, watch: watchDivision, formState: { errors: divisionErrors, isSubmitting: divisionSubmitting } } = useForm<DivisionFormData & { code?: string; power_factor?: string }>({
+    resolver: zodResolver(divisionSchema) as any,
+    defaultValues: { sort_order: 0, code: '', power_factor: 'major' },
   })
 
   const { register: registerSubDivision, handleSubmit: handleSubDivisionSubmit, reset: resetSubDivision, setValue: setSubDivisionValue, watch: watchSubDivision, formState: { errors: subDivisionErrors, isSubmitting: subDivisionSubmitting } } = useForm<SubDivisionFormData>({
@@ -101,14 +101,17 @@ export function DivisionsPage() {
     setOpenSubDivision(true)
   }
 
-  async function onDivisionSubmit(data: DivisionFormData) {
+  async function onDivisionSubmit(data: DivisionFormData & { code?: string; power_factor?: string }) {
     try {
       if (editingDivision) {
         await api.put(`/divisions/${editingDivision.id}`, data)
         toast({ title: '更新成功' })
-        setOpenDivision(false)
-        void load()
+      } else {
+        await api.post(`/matches/${matchId}/divisions`, data)
+        toast({ title: '添加成功' })
       }
+      setOpenDivision(false)
+      void load()
     } catch (e) {
       toast({ title: '操作失败', description: String(e), variant: 'destructive' })
     }
@@ -140,6 +143,22 @@ export function DivisionsPage() {
     }
   }
 
+  async function deleteDivision(id: number) {
+    try {
+      await api.delete(`/divisions/${id}`)
+      toast({ title: '删除成功' })
+      void load()
+    } catch (e) {
+      toast({ title: '删除失败', description: String(e), variant: 'destructive' })
+    }
+  }
+
+  function openCreateDivision() {
+    setEditingDivision(null)
+    resetDivision({ name: '', sort_order: divisions.length })
+    setOpenDivision(true)
+  }
+
   const genderLabel = (g?: string | null) => g === 'male' ? '男' : g === 'female' ? '女' : '-'
   const ageRange = (sd: SubDivision) => {
     if (sd.min_age !== null && sd.max_age !== null) return `${sd.min_age}-${sd.max_age}`
@@ -160,7 +179,13 @@ export function DivisionsPage() {
         <>
           {/* Divisions Section */}
           <div className="mb-8">
-            <h2 className="text-lg font-semibold mb-4">主级别 (Divisions)</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">主级别 (Divisions)</h2>
+              <Button onClick={openCreateDivision} size="sm">
+                <PlusCircle className="h-4 w-4 mr-2" />
+                添加组别
+              </Button>
+            </div>
             {divisions.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">暂无组别</div>
             ) : (
@@ -185,10 +210,27 @@ export function DivisionsPage() {
                           {d.power_factor === 'major' ? '🟠 major' : '🔵 minor'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right space-x-2">
                         <Button variant="ghost" size="icon" onClick={() => openEditDivision(d)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>确认删除</AlertDialogTitle>
+                              <AlertDialogDescription>确定要删除组别 "{d.name}" ({d.code}) 吗？有关联射手时无法删除。</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>取消</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => deleteDivision(d.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">删除</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -263,20 +305,58 @@ export function DivisionsPage() {
       <Dialog open={openDivision} onOpenChange={setOpenDivision}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>编辑组别</DialogTitle>
+            <DialogTitle>{editingDivision ? '编辑组别' : '添加组别'}</DialogTitle>
             <DialogDescription></DialogDescription>
           </DialogHeader>
           <form onSubmit={handleDivisionSubmit(onDivisionSubmit)} className="space-y-4">
-            <div className="space-y-1">
-              <Label>组别代码</Label>
-              <div className="text-sm font-mono bg-muted p-2 rounded">{editingDivision?.code}</div>
-            </div>
-            <div className="space-y-1">
-              <Label>Power Factor</Label>
-              <div className="text-sm bg-muted p-2 rounded">
-                {editingDivision?.power_factor === 'major' ? '🟠 major' : '🔵 minor'}
-              </div>
-            </div>
+            {editingDivision ? (
+              <>
+                <div className="space-y-1">
+                  <Label>组别代码</Label>
+                  <div className="text-sm font-mono bg-muted p-2 rounded">{editingDivision.code}</div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Power Factor</Label>
+                  <div className="text-sm bg-muted p-2 rounded">
+                    {editingDivision.power_factor === 'major' ? '🟠 major' : '🔵 minor'}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <Label>组别代码</Label>
+                  <Select
+                    value={watchDivision('code') ?? ''}
+                    onValueChange={v => setDivisionValue('code', v as any)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择组别" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['production', 'open', 'standard', 'classic', 'optics'].map(c => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Power Factor</Label>
+                  <Select
+                    value={watchDivision('power_factor') ?? ''}
+                    onValueChange={v => setDivisionValue('power_factor', v as any)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择 Power Factor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="major">🟠 Major</SelectItem>
+                      <SelectItem value="minor">🔵 Minor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
             <div className="space-y-1">
               <Label>组别名称</Label>
               <Input placeholder="e.g. Open / Standard / Production" {...registerDivision('name')} />

@@ -12,14 +12,12 @@ import { ScoresPage } from '@/pages/ScoresPage'
 import { ScoreCardPage } from '@/pages/ScoreCardPage'
 import { ScoreCardSummaryPage } from '@/pages/ScoreCardSummaryPage'
 import { LeaderboardPage } from '@/pages/LeaderboardPage'
+import { LiveScorecardPage } from '@/pages/LiveScorecardPage'
 import { LeaderboardLivestreamPage } from '@/pages/LeaderboardLivestreamPage'
-import { ScoreCardLivestreamPage } from '@/pages/ScoreCardLivestreamPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { AdminClubsPage } from '@/pages/AdminClubsPage'
 import { AdminUsersPage } from '@/pages/AdminUsersPage'
 import { AdminMatchesPage } from '@/pages/AdminMatchesPage'
-import { DrillReplaysPage } from '@/pages/DrillReplaysPage'
-import { DrillReplayDetailPage } from '@/pages/DrillReplayDetailPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isLoggedIn, loading } = useAuth()
@@ -48,14 +46,6 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route
-              element={<AppLayout />}
-            >
-              {/* Public livestream routes — no auth required */}
-              <Route path="/matches/:id/score-card-live" element={<ScoreCardLivestreamPage />} />
-              {/* No-id variant auto-follows the currently active match */}
-              <Route path="/score-card-live" element={<ScoreCardLivestreamPage />} />
-            </Route>
-            <Route
               element={
                 <RequireAuth>
                   <AppLayout />
@@ -70,9 +60,8 @@ export default function App() {
               <Route path="/matches/:id/scores" element={<ScoresPage />} />
               <Route path="/matches/:id/score-card" element={<ScoreCardPage />} />
               <Route path="/matches/:id/score-card/summary" element={<ScoreCardSummaryPage />} />
-              <Route path="/matches/:id/drill-replays" element={<DrillReplaysPage />} />
-              <Route path="/matches/:id/drill-replays/:replayId" element={<DrillReplayDetailPage />} />
               <Route path="/matches/:id/leaderboard" element={<LeaderboardPage />} />
+              <Route path="/matches/:id/score-card-live" element={<LiveScorecardPage />} />
               <Route path="/matches/:id/leaderboard-live" element={<LeaderboardLivestreamPage />} />
               <Route
                 path="/admin/clubs"

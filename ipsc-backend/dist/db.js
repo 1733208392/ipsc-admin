@@ -190,6 +190,29 @@ db.exec(`
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS drill_replays (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    shooter_id INTEGER NOT NULL REFERENCES shooters(id) ON DELETE CASCADE,
+    stage_id INTEGER NOT NULL REFERENCES stages(id) ON DELETE CASCADE,
+    drill_name TEXT,
+    total_time REAL NOT NULL DEFAULT 0,
+    num_shots INTEGER NOT NULL DEFAULT 0,
+    score INTEGER,
+    payload_json TEXT NOT NULL,
+    client_drill_result_id TEXT,
+    device_id TEXT,
+    uploaded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_drill_replays_match ON drill_replays(match_id);
+  CREATE INDEX IF NOT EXISTS idx_drill_replays_shooter ON drill_replays(shooter_id);
+  CREATE INDEX IF NOT EXISTS idx_drill_replays_stage ON drill_replays(stage_id);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_drill_replays_client_uuid
+    ON drill_replays(shooter_id, stage_id, client_drill_result_id)
+    WHERE client_drill_result_id IS NOT NULL;
 `);
 const clubCount = db.prepare(`SELECT COUNT(*) AS c FROM clubs`).get().c;
 if (clubCount === 0) {

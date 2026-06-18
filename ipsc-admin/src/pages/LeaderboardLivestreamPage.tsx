@@ -36,10 +36,8 @@ export function LeaderboardLivestreamPage() {
   const [stages, setStages] = useState<Stage[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDivision, setSelectedDivision] = useState<string>('')
-  const [selectedStage, setSelectedStage] = useState<string>('')
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [autoRotate, setAutoRotate] = useState(true)
   const { setCurrentMatch } = useMatch()
   const { toast } = useToast()
 
@@ -54,16 +52,6 @@ export function LeaderboardLivestreamPage() {
     () => divisions.find((d) => String(d.id) === selectedDivision)?.name ?? 'No Division',
     [divisions, selectedDivision]
   )
-
-  const activeStageName = useMemo(
-    () => stages.find((s) => String(s.id) === selectedStage)?.name ?? '',
-    [stages, selectedStage]
-  )
-
-  const gridTemplate = useMemo(() => {
-    // Rank | Name | Time | Hit Factor | Percentage | Stage Points
-    return '110px 1.6fr 0.9fr 0.9fr 0.9fr 1.0fr'
-  }, [])
 
   async function load() {
     if (!matchId) return
@@ -80,13 +68,10 @@ export function LeaderboardLivestreamPage() {
         .filter((d) => supportedDivisionCodes.has(d.code))
       const sortedStages = [...stagesData].sort((a, b) => a.sort_order - b.sort_order)
       const effectiveDivision = selectedDivision || (visibleDivisions[0] ? String(visibleDivisions[0].id) : '')
-      const effectiveStage = selectedStage || (sortedStages[0] ? String(sortedStages[0].id) : '')
+      const effectiveStage = sortedStages[0] ? String(sortedStages[0].id) : ''
 
       if (effectiveDivision !== selectedDivision) {
         setSelectedDivision(effectiveDivision)
-      }
-      if (effectiveStage !== selectedStage) {
-        setSelectedStage(effectiveStage)
       }
 
       let nextRankings: LeaderboardEntry[] = []
@@ -117,18 +102,11 @@ export function LeaderboardLivestreamPage() {
   useEffect(() => {
     setLoading(true)
     void load()
-  }, [matchId, selectedDivision, selectedStage, selectedCategory])
+  }, [matchId, selectedDivision, selectedCategory])
 
-  // Auto-rotate: every 10s advance the stage; when the stage list wraps,
-  // advance to the next division. This cycles through every (division, stage)
-  // combination so the broadcast covers everything.
   useEffect(() => {
     if (switchIntervalRef.current) {
       clearInterval(switchIntervalRef.current)
-    }
-
-    if (!autoRotate) {
-      return
     }
 
     if (divisions.length <= 1) {
@@ -136,17 +114,23 @@ export function LeaderboardLivestreamPage() {
     }
 
     switchIntervalRef.current = setInterval(() => {
-      const divIdx = divisions.findIndex((d) => String(d.id) === selectedDivision)
-      const nextDivIdx = divIdx < 0 ? 0 : (divIdx + 1) % divisions.length
-      setSelectedDivision(String(divisions[nextDivIdx].id))
-    }, 7000)
+      setSelectedDivision((current) => {
+        const currentIndex = divisions.findIndex((d) => String(d.id) === current)
+        if (currentIndex < 0) {
+          return String(divisions[0].id)
+        }
+
+        const nextIndex = (currentIndex + 1) % divisions.length
+        return String(divisions[nextIndex].id)
+      })
+    }, 10000)
 
     return () => {
       if (switchIntervalRef.current) {
         clearInterval(switchIntervalRef.current)
       }
     }
-  }, [divisions, stages, selectedDivision, selectedStage, autoRotate])
+  }, [divisions])
 
   useEffect(() => {
     function handleFullscreenChange() {
@@ -173,7 +157,7 @@ export function LeaderboardLivestreamPage() {
 
   return (
     <div
-      className={`${isFullscreen ? 'min-h-screen' : 'min-h-[calc(100vh-3rem)]'} px-3 py-4 text-white md:px-8 md:py-8`}
+      className={`${isFullscreen ? 'min-h-screen' : 'min-h-[calc(100vh-3rem)]'} px-2 py-2 text-white sm:px-4 sm:py-3 lg:px-8 lg:py-6 xl:px-8 xl:py-8`}
       style={{
         backgroundColor: '#000',
         backgroundImage: `linear-gradient(160deg, rgba(3, 5, 8, 0.62) 0%, rgba(4, 7, 12, 0.56) 45%, rgba(6, 8, 12, 0.62) 100%), url(${backgroundImage})`,
@@ -182,15 +166,15 @@ export function LeaderboardLivestreamPage() {
         backgroundRepeat: 'no-repeat, no-repeat',
       }}
     >
-      <div className="mx-auto max-w-[1600px] rounded-2xl p-3 md:p-6">
-        <div className="relative overflow-hidden rounded-xl px-4 pb-4 pt-3 md:px-10 md:pb-8 md:pt-5">
+      <div className="mx-auto max-w-[1600px] rounded-2xl p-2 sm:p-3 lg:p-5 xl:p-6">
+        <div className="relative overflow-hidden rounded-xl px-3 pb-3 pt-2 sm:px-4 sm:pb-4 sm:pt-3 lg:px-8 lg:pb-6 lg:pt-4 xl:px-10 xl:pb-8 xl:pt-5">
           <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:44px_44px]" />
 
-          <div className="relative mb-4 flex justify-end">
+          <div className="relative mb-3 flex justify-end sm:mb-4">
             <Button
               size="sm"
               variant="outline"
-              className="ls-ui-font h-8 rounded-md border-zinc-500/60 bg-black/30 px-3 text-[11px] uppercase tracking-[0.18em] text-zinc-100 hover:bg-black/45"
+              className="ls-ui-font h-7 rounded-md border-zinc-500/60 bg-black/30 px-2 text-[10px] uppercase tracking-[0.18em] text-zinc-100 hover:bg-black/45 sm:h-8 sm:px-3 sm:text-[11px]"
               onClick={() => void handleToggleFullscreen()}
             >
               {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
@@ -198,64 +182,26 @@ export function LeaderboardLivestreamPage() {
           </div>
 
           <div className="relative text-center">
-            <h1 className="ls-title-font text-[22px] font-black italic uppercase leading-none tracking-[0.03em] text-zinc-100 md:text-[44px]">
+            <h1 className="ls-title-font text-[16px] font-black italic uppercase leading-none tracking-[0.03em] text-zinc-100 sm:text-[20px] lg:text-[32px] xl:text-[44px]">
               <span className="bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-500 bg-clip-text text-transparent">
                 {activeDivisionName}
               </span>
-              <span className="mx-2 text-red-600 md:mx-4">/</span>
+              <span className="mx-1 text-red-600 sm:mx-2 lg:mx-3 xl:mx-4">/</span>
               <span className="text-red-500">{activeCategoryLabel.toUpperCase()}</span>
             </h1>
-            <p className="ls-ui-font mt-2 text-[11px] font-semibold uppercase tracking-[0.34em] text-zinc-500 md:text-[14px]">
-              {activeStageName ? `Stage · ${activeStageName}` : 'IPSC Shooting Game'}
+            <p className="ls-ui-font mt-1 text-[8px] font-semibold uppercase tracking-[0.34em] text-zinc-500 sm:text-[9px] lg:text-[11px]">
+              IPSC Shooting Game
             </p>
           </div>
 
-          {stages.length > 0 && (
-            <div className="relative mt-6 flex flex-wrap justify-center gap-2 md:mt-8 md:gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setAutoRotate(true)}
-                className={`ls-ui-font h-9 min-w-20 rounded-none border px-4 text-[11px] font-bold uppercase tracking-[0.08em] [clip-path:polygon(7%_0,93%_0,100%_50%,93%_100%,7%_100%,0_50%)] md:min-w-28 md:text-base ${
-                  autoRotate
-                    ? 'border-red-500/90 bg-[linear-gradient(110deg,rgba(127,29,29,0.96),rgba(239,68,68,0.72))] text-zinc-100 shadow-[0_0_24px_rgba(239,68,68,0.35)]'
-                    : 'border-zinc-600 bg-zinc-900/70 text-zinc-300 hover:bg-zinc-800'
-                }`}
-              >
-                Auto
-              </Button>
-              {stages.map((s) => {
-                const active = !autoRotate && String(s.id) === selectedStage
-                return (
-                  <Button
-                    key={s.id}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setAutoRotate(false)
-                      setSelectedStage(String(s.id))
-                    }}
-                    className={`ls-ui-font h-9 min-w-20 rounded-none border px-4 text-[11px] font-bold uppercase tracking-[0.08em] [clip-path:polygon(7%_0,93%_0,100%_50%,93%_100%,7%_100%,0_50%)] md:min-w-28 md:text-base ${
-                      active
-                        ? 'border-red-500/90 bg-[linear-gradient(110deg,rgba(127,29,29,0.96),rgba(239,68,68,0.72))] text-zinc-100 shadow-[0_0_24px_rgba(239,68,68,0.35)]'
-                        : 'border-zinc-600 bg-zinc-900/70 text-zinc-300 hover:bg-zinc-800'
-                    }`}
-                  >
-                    {s.name}
-                  </Button>
-                )
-              })}
-            </div>
-          )}
-
-          <div className="relative mt-10 flex flex-wrap justify-center gap-2 md:mt-12 md:gap-3">
+          <div className="relative mt-6 flex flex-wrap justify-center gap-1.5 sm:mt-8 sm:gap-2 lg:mt-10 lg:gap-3 xl:mt-12">
             {categories.map((c) => (
               <Button
                 key={c.value || 'all-category'}
                 variant="ghost"
                 size="sm"
                 onClick={() => setSelectedCategory(c.value)}
-                className={`ls-ui-font h-10 min-w-24 rounded-none border px-5 text-xs font-bold uppercase tracking-[0.08em] [clip-path:polygon(7%_0,93%_0,100%_50%,93%_100%,7%_100%,0_50%)] md:min-w-36 md:text-lg ${
+                className={`ls-ui-font h-7 min-w-16 rounded-none border px-2 text-[9px] font-bold uppercase tracking-[0.08em] [clip-path:polygon(7%_0,93%_0,100%_50%,93%_100%,7%_100%,0_50%)] sm:h-8 sm:min-w-20 sm:px-3 sm:text-[10px] lg:h-10 lg:min-w-32 lg:px-5 lg:text-sm xl:min-w-36 xl:text-lg ${
                   selectedCategory === c.value
                     ? 'border-red-500/90 bg-[linear-gradient(110deg,rgba(127,29,29,0.96),rgba(239,68,68,0.72))] text-zinc-100 shadow-[0_0_24px_rgba(239,68,68,0.35)]'
                     : 'border-zinc-600 bg-zinc-900/70 text-zinc-300 hover:bg-zinc-800'
@@ -268,70 +214,62 @@ export function LeaderboardLivestreamPage() {
         </div>
 
         {loading ? (
-          <div className="mt-4 space-y-3">
+          <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-3">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-20 animate-pulse rounded-xl bg-black/35" />
+              <div key={i} className="h-14 animate-pulse rounded-xl bg-black/35 sm:h-16 lg:h-20" />
             ))}
           </div>
         ) : divisions.length === 0 ? (
-          <div className="mt-4 rounded-xl bg-black/35 p-10 text-center text-zinc-300">
+          <div className="mt-4 rounded-xl bg-black/35 p-6 text-center text-zinc-300 sm:p-8 lg:p-10">
             No eligible divisions to display. Livestream supports Production, Production Optics, and Standard only.
           </div>
         ) : stages.length === 0 ? (
-          <div className="mt-4 rounded-xl bg-black/35 p-10 text-center text-zinc-300">
-            No stages configured for this match.
+          <div className="mt-4 rounded-xl bg-black/35 p-6 text-center text-zinc-300 sm:p-8 lg:p-10">
+            No stage is available, so livestream leaderboard cannot be calculated.
           </div>
         ) : rankings.length === 0 ? (
-          <div className="mt-4 rounded-xl bg-black/35 p-10 text-center text-zinc-300">
+          <div className="mt-4 rounded-xl bg-black/35 p-6 text-center text-zinc-300 sm:p-8 lg:p-10">
             No rankings found for this division and category.
           </div>
         ) : (
-          <div className="mt-4">
-            <div
-              className="ls-ui-font grid items-center rounded-t-lg bg-black/35 px-3 py-3 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-300 md:px-6 md:text-[16px] md:tracking-[0.08em]"
-              style={{ gridTemplateColumns: gridTemplate }}
-            >
+          <div className="mt-3 sm:mt-4">
+            <div className="ls-ui-font grid grid-cols-[40px_1.2fr_0.8fr_0.8fr_1fr] items-center rounded-t-lg bg-black/35 px-2 py-1.5 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-300 sm:grid-cols-[60px_1.2fr_0.8fr_0.8fr_1fr] sm:px-3 sm:py-2 sm:text-[9px] lg:grid-cols-[100px_1.4fr_1fr_1fr_1fr] lg:px-5 lg:py-3 lg:text-[14px] lg:tracking-[0.08em] xl:grid-cols-[110px_1.4fr_1fr_1fr_1fr] xl:px-6 xl:py-3 xl:text-[16px]">
               <span>Rank</span>
               <span>Name</span>
-              <span className="text-right">Time</span>
-              <span className="text-right">Hit Factor</span>
+              <span className="text-right">HF</span>
               <span className="text-right">%</span>
-              <span className="text-right text-red-400">Stage Pts</span>
+              <span className="text-right">Stage Points</span>
             </div>
 
-            <div className="space-y-3 p-2 md:p-4">
+            <div className="space-y-1 p-1 sm:space-y-1.5 sm:p-1.5 lg:space-y-2.5 lg:p-3">
               {rankings.map((entry, idx) => {
-                const rank = entry.rank_in_stage ?? entry.rank ?? idx + 1
+                const rank = entry.rank_in_stage ?? idx + 1
                 const rowBackground = getAlternatingRowBackground(idx)
                 return (
                   <div
                     key={entry.id}
-                    className="relative bg-center bg-no-repeat px-3 py-3 text-white md:grid md:px-6 md:py-4"
+                    className="relative flex flex-wrap items-center gap-1 bg-center bg-no-repeat px-2 py-1.5 text-white sm:gap-1.5 sm:px-3 sm:py-2 lg:grid lg:grid-cols-[100px_1.4fr_1fr_1fr_1fr] lg:gap-0 lg:px-5 lg:py-3 xl:grid-cols-[110px_1.4fr_1fr_1fr_1fr] xl:px-6 xl:py-4"
                     style={{
                       backgroundImage: `url(${rowBackground})`,
                       backgroundSize: '100% 100%',
-                      gridTemplateColumns: gridTemplate,
                     }}
                   >
-                    <div className="relative grid grid-cols-[72px_1fr] items-center gap-2 md:block">
-                      <div className="ls-number-font text-4xl font-black leading-none text-zinc-100 md:text-[44px]">{rank}</div>
+                    <div className="relative flex items-center gap-1 sm:gap-2 lg:block w-10 sm:w-16">
+                      <div className="ls-number-font text-lg font-black leading-none text-zinc-100 sm:text-2xl lg:text-[36px] xl:text-[44px]">{rank}</div>
                     </div>
-                    <div className="relative pr-2">
-                      <div className="ls-title-font truncate text-xl font-black text-zinc-100 md:text-[28px]">{entry.name}</div>
-                      <div className="ls-ui-font mt-1 text-[10px] font-semibold tracking-[0.2em] text-zinc-400 md:text-[13px]">
+                    <div className="relative flex-1 min-w-0 pr-1 sm:pr-2">
+                      <div className="ls-title-font truncate text-sm font-black text-zinc-100 sm:text-base lg:text-[22px] xl:text-[28px]">{entry.name}</div>
+                      <div className="ls-ui-font text-[8px] font-semibold tracking-[0.2em] text-zinc-400 sm:text-[9px] lg:text-[12px] xl:text-[13px]">
                         #{String(entry.bib_number ?? '').padStart(4, '0')}
                       </div>
                     </div>
-                    <div className="ls-number-font relative mt-2 text-right text-2xl font-black text-zinc-100 md:mt-0 md:text-[32px]">
-                      {entry.total_time != null ? `${formatNumeric(entry.total_time, 2)}s` : '—'}
+                    <div className="ls-number-font relative flex-1 text-right text-base font-black text-zinc-100 sm:text-lg lg:text-[26px] xl:text-[32px]">
+                      {formatNumeric(entry.hit_factor, 2)}
                     </div>
-                    <div className="ls-number-font relative mt-2 text-right text-2xl font-black text-zinc-100 md:mt-0 md:text-[32px]">
-                      {entry.hit_factor != null ? formatNumeric(entry.hit_factor, 4) : '—'}
+                    <div className="ls-number-font relative flex-1 text-right text-base font-black text-zinc-100 sm:text-lg lg:text-[26px] xl:text-[32px]">
+                      {formatNumeric(entry.percentage, 1)}%
                     </div>
-                    <div className="ls-number-font relative mt-2 text-right text-2xl font-black text-zinc-100 md:mt-0 md:text-[32px]">
-                      {entry.percentage != null ? `${formatNumeric(entry.percentage, 2)}%` : '—'}
-                    </div>
-                    <div className="ls-number-font relative mt-2 text-right text-2xl font-black text-red-400 md:mt-0 md:text-[32px]">
+                    <div className="ls-number-font relative flex-1 text-right text-base font-black text-zinc-100 sm:text-lg lg:text-[26px] xl:text-[32px]">
                       {formatNumeric(entry.stage_points_earned, 2)}
                     </div>
                   </div>

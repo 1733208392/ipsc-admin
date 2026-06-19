@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
-import { Download, Maximize2, Minimize2 } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { toPng } from 'html-to-image'
 import { api } from '@/lib/api'
 import { useMatch } from '@/hooks/useMatch'

@@ -22,6 +22,7 @@ db.exec(`
     short_name TEXT NOT NULL,
     contact_name TEXT,
     contact_phone TEXT,
+    is_personal INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','inactive')),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -213,11 +214,209 @@ db.exec(`
   CREATE UNIQUE INDEX IF NOT EXISTS idx_drill_replays_client_uuid
     ON drill_replays(shooter_id, stage_id, client_drill_result_id)
     WHERE client_drill_result_id IS NOT NULL;
+
+  CREATE TABLE IF NOT EXISTS drill_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    stage_id INTEGER NOT NULL REFERENCES stages(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    timeout INTEGER NOT NULL DEFAULT 1200,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS drill_template_targets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    template_id INTEGER NOT NULL REFERENCES drill_templates(id) ON DELETE CASCADE,
+    seq_no INTEGER NOT NULL,
+    target_name TEXT NOT NULL DEFAULT '',
+    target_type TEXT NOT NULL DEFAULT '[]',
+    timeout INTEGER NOT NULL DEFAULT 0,
+    counted_shots INTEGER NOT NULL DEFAULT 0,
+    target_variant TEXT,
+    has_physical_popper INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    UNIQUE(template_id, seq_no)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_drill_templates_stage ON drill_templates(stage_id);
+  CREATE INDEX IF NOT EXISTS idx_drill_templates_match ON drill_templates(match_id);
+  CREATE INDEX IF NOT EXISTS idx_drill_targets_template ON drill_template_targets(template_id);
 `);
+function tableExists(tableName) {
+    const row = db
+        .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`)
+        .get(tableName);
+    return Boolean(row);
+}
+function getTableColumns(tableName) {
+    return db.prepare(`PRAGMA table_info(${tableName})`).all();
+}
+function ensurePersonalClubColumn() {
+    const columns = getTableColumns('clubs');
+    if (!columns.some((column) => column.name === 'is_personal')) {
+        db.exec(`ALTER TABLE clubs ADD COLUMN is_personal INTEGER NOT NULL DEFAULT 0`);
+    }
+}
+function ensureDrillTemplateSchema() {
+    if (!tableExists('drill_templates')) {
+        return;
+    }
+    const columns = getTableColumns('drill_templates');
+    const hasOwnerUserId = columns.some((column) => column.name === 'owner_user_id');
+    if (hasOwnerUserId) {
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_templates_stage ON drill_templates(stage_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_templates_match ON drill_templates(match_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_templates_owner ON drill_templates(owner_user_id)`);
+        return;
+    }
+    const beforeCount = db.prepare(`SELECT COUNT(*) AS c FROM drill_templates`).get().c;
+    db.exec(`DROP TABLE IF EXISTS drill_templates_new`);
+    db.exec(`PRAGMA foreign_keys = OFF`);
+    db.exec(`BEGIN TRANSACTION`);
+    try {
+        db.exec(`
+      CREATE TABLE drill_templates_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        match_id INTEGER REFERENCES matches(id) ON DELETE CASCADE,
+        stage_id INTEGER REFERENCES stages(id) ON DELETE CASCADE,
+        owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        timeout INTEGER NOT NULL DEFAULT 1200,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        CHECK (
+          (match_id IS NOT NULL AND stage_id IS NOT NULL AND owner_user_id IS NULL) OR
+          (match_id IS NULL AND stage_id IS NULL AND owner_user_id IS NOT NULL)
+        )
+      )
+    `);
+        db.exec(`
+      INSERT INTO drill_templates_new (id, match_id, stage_id, owner_user_id, name, timeout, sort_order, created_at, updated_at)
+      SELECT id, match_id, stage_id, NULL, name, timeout, sort_order, created_at, updated_at
+      FROM drill_templates
+    `);
+        db.exec(`DROP TABLE drill_templates`);
+        db.exec(`ALTER TABLE drill_templates_new RENAME TO drill_templates`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_templates_stage ON drill_templates(stage_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_templates_match ON drill_templates(match_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_templates_owner ON drill_templates(owner_user_id)`);
+        db.exec(`COMMIT`);
+    }
+    catch (err) {
+        db.exec(`ROLLBACK`);
+        throw err;
+    }
+    finally {
+        db.exec(`PRAGMA foreign_keys = ON`);
+    }
+    const afterCount = db.prepare(`SELECT COUNT(*) AS c FROM drill_templates`).get().c;
+    if (beforeCount !== afterCount) {
+        throw new Error(`drill_templates migration row count mismatch: before=${beforeCount} after=${afterCount}`);
+    }
+}
+function ensureDrillReplaySchema() {
+    if (!tableExists('drill_replays')) {
+        return;
+    }
+    const columns = getTableColumns('drill_replays');
+    const hasOwnerUserId = columns.some((column) => column.name === 'owner_user_id');
+    if (hasOwnerUserId) {
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_replays_match ON drill_replays(match_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_replays_shooter ON drill_replays(shooter_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_replays_stage ON drill_replays(stage_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_replays_owner ON drill_replays(owner_user_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_replays_template ON drill_replays(drill_template_id)`);
+        db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_drill_replays_client_uuid
+      ON drill_replays(shooter_id, stage_id, client_drill_result_id)
+      WHERE client_drill_result_id IS NOT NULL AND shooter_id IS NOT NULL
+    `);
+        db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_drill_replays_client_uuid_personal
+      ON drill_replays(owner_user_id, client_drill_result_id)
+      WHERE client_drill_result_id IS NOT NULL AND owner_user_id IS NOT NULL
+    `);
+        return;
+    }
+    const beforeCount = db.prepare(`SELECT COUNT(*) AS c FROM drill_replays`).get().c;
+    db.exec(`DROP TABLE IF EXISTS drill_replays_new`);
+    db.exec(`PRAGMA foreign_keys = OFF`);
+    db.exec(`BEGIN TRANSACTION`);
+    try {
+        db.exec(`
+      CREATE TABLE drill_replays_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        match_id INTEGER REFERENCES matches(id) ON DELETE CASCADE,
+        shooter_id INTEGER REFERENCES shooters(id) ON DELETE CASCADE,
+        stage_id INTEGER REFERENCES stages(id) ON DELETE CASCADE,
+        owner_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        drill_template_id INTEGER REFERENCES drill_templates(id) ON DELETE SET NULL,
+        drill_name TEXT,
+        total_time REAL NOT NULL DEFAULT 0,
+        num_shots INTEGER NOT NULL DEFAULT 0,
+        score INTEGER,
+        payload_json TEXT NOT NULL,
+        client_drill_result_id TEXT,
+        device_id TEXT,
+        uploaded_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        CHECK (
+          (match_id IS NOT NULL AND shooter_id IS NOT NULL AND stage_id IS NOT NULL AND owner_user_id IS NULL) OR
+          (match_id IS NULL AND shooter_id IS NULL AND stage_id IS NULL AND owner_user_id IS NOT NULL)
+        )
+      )
+    `);
+        db.exec(`
+      INSERT INTO drill_replays_new (
+        id, match_id, shooter_id, stage_id, owner_user_id, drill_template_id, drill_name,
+        total_time, num_shots, score, payload_json, client_drill_result_id, device_id, uploaded_by, created_at
+      )
+      SELECT
+        id, match_id, shooter_id, stage_id, NULL, NULL, drill_name,
+        total_time, num_shots, score, payload_json, client_drill_result_id, device_id, uploaded_by, created_at
+      FROM drill_replays
+    `);
+        db.exec(`DROP TABLE drill_replays`);
+        db.exec(`ALTER TABLE drill_replays_new RENAME TO drill_replays`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_replays_match ON drill_replays(match_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_replays_shooter ON drill_replays(shooter_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_replays_stage ON drill_replays(stage_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_replays_owner ON drill_replays(owner_user_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_drill_replays_template ON drill_replays(drill_template_id)`);
+        db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_drill_replays_client_uuid
+      ON drill_replays(shooter_id, stage_id, client_drill_result_id)
+      WHERE client_drill_result_id IS NOT NULL AND shooter_id IS NOT NULL
+    `);
+        db.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_drill_replays_client_uuid_personal
+      ON drill_replays(owner_user_id, client_drill_result_id)
+      WHERE client_drill_result_id IS NOT NULL AND owner_user_id IS NOT NULL
+    `);
+        db.exec(`COMMIT`);
+    }
+    catch (err) {
+        db.exec(`ROLLBACK`);
+        throw err;
+    }
+    finally {
+        db.exec(`PRAGMA foreign_keys = ON`);
+    }
+    const afterCount = db.prepare(`SELECT COUNT(*) AS c FROM drill_replays`).get().c;
+    if (beforeCount !== afterCount) {
+        throw new Error(`drill_replays migration row count mismatch: before=${beforeCount} after=${afterCount}`);
+    }
+}
+ensurePersonalClubColumn();
+ensureDrillTemplateSchema();
+ensureDrillReplaySchema();
 const clubCount = db.prepare(`SELECT COUNT(*) AS c FROM clubs`).get().c;
 if (clubCount === 0) {
-    db.prepare(`INSERT INTO clubs (name, short_name, contact_name, contact_phone, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`).run('Default Club', 'DEFAULT', null, null);
+    db.prepare(`INSERT INTO clubs (name, short_name, contact_name, contact_phone, is_personal, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 0, 'active', datetime('now'), datetime('now'))`).run('Default Club', 'DEFAULT', null, null);
 }
 const defaultClub = db
     .prepare(`SELECT id FROM clubs WHERE status = 'active' ORDER BY id LIMIT 1`)

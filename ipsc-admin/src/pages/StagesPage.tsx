@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { PlusCircle, Pencil, Trash2 } from 'lucide-react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { PlusCircle, Pencil, Trash2, ClipboardList } from 'lucide-react'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -57,6 +57,7 @@ const BRIEFING_TEMPLATE = `Stage 简报模板
 
 export function StagesPage() {
   const { id: matchId } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [stages, setStages] = useState<Stage[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
@@ -235,6 +236,10 @@ export function StagesPage() {
                 <TableCell>{s.targets_count ?? 0}</TableCell>
                 <TableCell>{s.poppers_plates_count ?? 0}</TableCell>
                 <TableCell className="text-right space-x-2">
+                  <Button variant="outline" size="sm" onClick={() => navigate(`/matches/${matchId}/stages/${s.id}/drills`)}>
+                    <ClipboardList className="h-4 w-4 mr-2" />
+                    Drill 配置
+                  </Button>
                   <Button variant="ghost" size="icon" onClick={() => openEdit(s)}>
                     <Pencil className="h-4 w-4" />
                   </Button>

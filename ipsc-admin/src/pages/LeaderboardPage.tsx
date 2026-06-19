@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 
 import { api } from '@/lib/api'
@@ -167,8 +167,6 @@ export function LeaderboardPage() {
   const [selectedStage, setSelectedStage] = useState<string>('')
   const { setCurrentMatch } = useMatch()
   const { toast } = useToast()
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
   async function load() {
     try {
       const [divsData, stagesData, match] = await Promise.all([
@@ -214,21 +212,10 @@ export function LeaderboardPage() {
     void load()
   }, [selectedDivision, selectedCategory, selectedStage, matchId])
 
-  useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setLoading(true)
-      void load()
-    }, 10000)
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [selectedDivision, selectedCategory, selectedStage, matchId])
-
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">积分榜</h1>
-        <span className="text-xs text-muted-foreground">每 10 秒自动刷新</span>
       </div>
 
       {loading ? (

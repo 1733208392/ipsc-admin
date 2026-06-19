@@ -158,6 +158,13 @@ export const UpdateUserSchema = z.object({
   status: z.enum(['active', 'inactive']).optional(),
 });
 
+export const RegisterSchema = z.object({
+  username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_]+$/, '用户名只能包含字母、数字、下划线'),
+  password: z.string().min(6).max(50),
+  name: z.string().min(1).max(50),
+  phone: z.string().optional(),
+});
+
 export const CreateGlobalShooterSchema = z.object({
   name: z.string().min(1),
   gender: z.enum(['male', 'female']),
@@ -299,6 +306,7 @@ export type CreateClub = z.infer<typeof CreateClubSchema>;
 export type UpdateClub = z.infer<typeof UpdateClubSchema>;
 export type CreateUser = z.infer<typeof CreateUserSchema>;
 export type UpdateUser = z.infer<typeof UpdateUserSchema>;
+export type RegisterInput = z.infer<typeof RegisterSchema>;
 export type CreateGlobalShooter = z.infer<typeof CreateGlobalShooterSchema>;
 export type UpdateGlobalShooter = z.infer<typeof UpdateGlobalShooterSchema>;
 export type ChangeSquad = z.infer<typeof ChangeSquadSchema>;
@@ -333,6 +341,81 @@ export const DrillReplayUploadSchema = z.object({
 });
 
 export type DrillReplayUploadInput = z.infer<typeof DrillReplayUploadSchema>;
+
+export const PersonalDrillReplayUploadSchema = z.object({
+  total_time: z.number().min(0).optional().default(0),
+  num_shots: z.number().int().min(0).optional().default(0),
+  score: z.number().int().optional(),
+  client_drill_result_id: z.string().min(1).optional(),
+  device_id: z.string().optional(),
+  payload: z.record(z.string(), z.unknown()),
+});
+
+export type PersonalDrillReplayUploadInput = z.infer<typeof PersonalDrillReplayUploadSchema>;
+
+// ── Drill Templates ──────────────────────────────────────────────────────────
+export const VALID_DRILL_TARGET_TYPES = [
+  'ipsc', 'ipsc_mini_double', 'hostage', 'paddle', 'popper', 'special_1', 'special_2',
+  'idpa', 'idpa_ns', 'idpa_black_1', 'idpa_black_2',
+  'cqb_swing', 'cqb_front', 'cqb_move', 'disguised_enemy', 'cqb_hostage',
+] as const;
+
+export const DrillTargetTypeSchema = z.enum(VALID_DRILL_TARGET_TYPES);
+
+export const DrillTargetTypeInputSchema = z.union([
+  DrillTargetTypeSchema,
+  z.array(DrillTargetTypeSchema).min(1),
+]);
+
+const DrillTargetVariantValueSchema = z.string().trim().refine((value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0;
+}, 'target_variant must be a positive number string');
+
+export const DrillTargetVariantInputSchema = z.union([
+  z.array(DrillTargetVariantValueSchema),
+  z.null(),
+]).optional();
+
+export const CreateDrillTargetSchema = z.object({
+  seq_no: z.number().int().min(0),
+  target_name: z.string().max(100).default(''),
+  target_type: DrillTargetTypeInputSchema,
+  timeout: z.number().int().min(0).optional().default(0),
+  counted_shots: z.number().int().min(0).optional().default(0),
+  target_variant: DrillTargetVariantInputSchema,
+  has_physical_popper: z.boolean().optional().default(false),
+  sort_order: z.number().int().optional().default(0),
+});
+
+export const CreateDrillTemplateSchema = z.object({
+  name: z.string().min(1).max(100),
+  timeout: z.number().int().min(1).max(9999).optional().default(1200),
+  sort_order: z.number().int().optional().default(0),
+});
+
+export const CreateDrillTemplateWithTargetsSchema = z.object({
+  name: z.string().min(1).max(100),
+  timeout: z.number().int().min(1).max(9999).optional().default(1200),
+  sort_order: z.number().int().optional().default(0),
+  targets: z.array(CreateDrillTargetSchema).min(1),
+});
+
+export const UpdateDrillTemplateSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  timeout: z.number().int().min(1).max(9999).optional(),
+  sort_order: z.number().int().optional(),
+});
+
+export const ReplaceDrillTargetsSchema = z.object({
+  targets: z.array(CreateDrillTargetSchema).min(1),
+});
+
+export type CreateDrillTargetInput = z.infer<typeof CreateDrillTargetSchema>;
+export type CreateDrillTemplateInput = z.infer<typeof CreateDrillTemplateSchema>;
+export type CreateDrillTemplateWithTargetsInput = z.infer<typeof CreateDrillTemplateWithTargetsSchema>;
+export type UpdateDrillTemplateInput = z.infer<typeof UpdateDrillTemplateSchema>;
+export type ReplaceDrillTargetsInput = z.infer<typeof ReplaceDrillTargetsSchema>;
 
 // ── Unified response helpers ───────────────────────────────────────────────────
 export function ok<T>(data: T) {

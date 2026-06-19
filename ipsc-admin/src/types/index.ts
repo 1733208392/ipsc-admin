@@ -42,6 +42,8 @@ export interface UserAccount {
 export interface LoginResult {
   token: string
   user: UserAccount
+  refresh_token?: string
+  expires_in?: number
 }
 
 export interface GlobalShooter {
@@ -245,3 +247,5 @@ export interface LeaderboardResponse {
   }
   rankings: LeaderboardEntry[]
 }
+
+export * from './my'

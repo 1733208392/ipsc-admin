@@ -1,9 +1,28 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import db from '../db.js';
-import { fail, ok } from '../types.js';
+import { fail, ok, RegisterSchema } from '../types.js';
 import { authMiddleware, createRefreshToken, revokeRefreshToken, rotateRefreshToken, signAccessToken, } from '../auth.js';
 const router = Router();
+function buildAuthResponse(user) {
+    const refresh = createRefreshToken(user);
+    const accessToken = signAccessToken(user);
+    return ok({
+        token: accessToken,
+        access_token: accessToken,
+        refresh_token: refresh.token,
+        expires_in: 24 * 60 * 60,
+        user: {
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            club_id: user.club_id,
+            name: user.name,
+            phone: user.phone,
+            status: user.status,
+        },
+    });
+}
 // POST /auth/login
 router.post('/login', (req, res) => {
     const username = String(req.body?.username ?? '').trim();
@@ -34,23 +53,47 @@ router.post('/login', (req, res) => {
         }
         db.prepare(`UPDATE users SET last_login_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).run(user.id);
         const freshUser = db.prepare(`SELECT * FROM users WHERE id = ?`).get(user.id);
-        const refresh = createRefreshToken(freshUser);
-        const accessToken = signAccessToken(freshUser);
-        res.json(ok({
-            token: accessToken,
-            access_token: accessToken,
-            refresh_token: refresh.token,
-            expires_in: 24 * 60 * 60,
-            user: {
-                id: freshUser.id,
-                username: freshUser.username,
-                role: freshUser.role,
-                club_id: freshUser.club_id,
-                name: freshUser.name,
-                phone: freshUser.phone,
-                status: freshUser.status,
-            },
-        }));
+        res.json(buildAuthResponse(freshUser));
+    }
+    catch (err) {
+        res.status(500).json(fail(String(err)));
+    }
+});
+// POST /auth/register
+router.post('/register', (req, res) => {
+    const parsed = RegisterSchema.safeParse(req.body);
+    if (!parsed.success) {
+        res.status(400).json(fail(parsed.error.message));
+        return;
+    }
+    const { username, password, name, phone } = parsed.data;
+    try {
+        const existing = db.prepare(`SELECT id FROM users WHERE username = ? LIMIT 1`).get(username);
+        if (existing) {
+            res.status(400).json(fail('用户名已存在'));
+            return;
+        }
+        const tx = db.transaction((payload) => {
+            const clubName = `${payload.name}的个人俱乐部`;
+            const clubShortName = `P_${payload.username}`;
+            const clubInfo = db
+                .prepare(`INSERT INTO clubs (name, short_name, contact_name, contact_phone, is_personal, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 1, 'active', datetime('now'), datetime('now'))`)
+                .run(clubName, clubShortName, payload.name, payload.phone ?? null);
+            const passwordHash = bcrypt.hashSync(payload.password, 10);
+            const userInfo = db
+                .prepare(`INSERT INTO users (username, password_hash, role, club_id, name, phone, status, created_at, updated_at)
+           VALUES (?, ?, 'club_admin', ?, ?, ?, 'active', datetime('now'), datetime('now'))`)
+                .run(payload.username, passwordHash, Number(clubInfo.lastInsertRowid), payload.name, payload.phone ?? null);
+            return Number(userInfo.lastInsertRowid);
+        });
+        const userId = tx(parsed.data);
+        const freshUser = db.prepare(`SELECT * FROM users WHERE id = ?`).get(userId);
+        if (!freshUser) {
+            res.status(500).json(fail('注册成功但无法加载用户信息'));
+            return;
+        }
+        res.status(201).json(buildAuthResponse(freshUser));
     }
     catch (err) {
         res.status(500).json(fail(String(err)));

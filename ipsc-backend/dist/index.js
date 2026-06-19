@@ -14,6 +14,9 @@ import scoresRouter, { getShooterScores, } from './routes/scores.js';
 import leaderboardRouter from './routes/leaderboard.js';
 import stageAttachmentsRouter from './routes/stage-attachments.js';
 import drillReplaysRouter, { getDrillReplay, deleteDrillReplay } from './routes/drill-replays.js';
+import drillsRouter from './routes/drills.js';
+import myDrillsRouter from './routes/my-drills.js';
+import myReplaysRouter from './routes/my-replays.js';
 import { getUploadsDir } from './services/stage-files.js';
 const app = express();
 const PORT = process.env['PORT'] ? Number(process.env['PORT']) : 3001;
@@ -71,6 +74,10 @@ api.use('/matches/:matchId/leaderboard', leaderboardRouter);
 api.use('/matches/:matchId/drill-replays', drillReplaysRouter);
 api.get('/drill-replays/:id', getDrillReplay);
 api.delete('/drill-replays/:id', deleteDrillReplay);
+// Drill Templates
+api.use(drillsRouter);
+api.use('/my', myDrillsRouter);
+api.use('/my', myReplaysRouter);
 app.use('/api/v1', api);
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {

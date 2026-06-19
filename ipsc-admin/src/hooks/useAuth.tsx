@@ -7,6 +7,7 @@ interface AuthContextValue {
   loading: boolean
   isLoggedIn: boolean
   login: (username: string, password: string) => Promise<void>
+  register: (payload: { username: string; password: string; name: string; phone?: string }) => Promise<void>
   logout: () => Promise<void>
   refreshMe: () => Promise<void>
 }
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextValue>({
   loading: true,
   isLoggedIn: false,
   login: async () => undefined,
+  register: async () => undefined,
   logout: async () => undefined,
   refreshMe: async () => undefined,
 })
@@ -36,6 +38,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function login(username: string, password: string) {
     const result = await api.post<LoginResult>('/auth/login', { username, password })
+    setToken(result.token)
+    setUser(result.user)
+  }
+
+  async function register(payload: { username: string; password: string; name: string; phone?: string }) {
+    const result = await api.post<LoginResult>('/auth/register', payload)
     setToken(result.token)
     setUser(result.user)
   }
@@ -64,6 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       isLoggedIn: !!user,
       login,
+      register,
       logout,
       refreshMe,
     }),

@@ -104,6 +104,15 @@ export function LeaderboardLivestreamPage() {
     void load()
   }, [matchId, selectedDivision, selectedCategory])
 
+  // 10s 自动刷新数据
+  useEffect(() => {
+    if (!matchId) return
+    const refreshTimer = setInterval(() => {
+      void load()
+    }, 10000)
+    return () => clearInterval(refreshTimer)
+  }, [matchId, selectedDivision, selectedCategory])
+
   useEffect(() => {
     if (switchIntervalRef.current) {
       clearInterval(switchIntervalRef.current)

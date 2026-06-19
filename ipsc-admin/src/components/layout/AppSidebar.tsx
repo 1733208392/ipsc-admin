@@ -1,5 +1,5 @@
 import { NavLink, useParams } from 'react-router-dom'
-import { Target, List, Users, Layers, Group, Trophy, ClipboardList, LogOut, Building2, UserCog, Shield, FileText, FileCheck, Activity, Radio } from 'lucide-react'
+import { Target, List, Users, Layers, Group, Trophy, LogOut, Building2, UserCog, Shield, FileText, FileCheck, Activity, Radio, Dumbbell, History, ChartColumnStacked } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMatch } from '@/hooks/useMatch'
 import { Separator } from '@/components/ui/separator'
@@ -49,6 +49,23 @@ export function AppSidebar({ collapsed = false }: { collapsed?: boolean }) {
         <NavLink to="/" className={navLinkClass} end>
           <List className="h-4 w-4" />
           {!collapsed ? '赛事列表' : null}
+        </NavLink>
+
+        <Separator className="my-2" />
+        {!collapsed ? (
+          <p className="px-3 py-1 text-xs text-muted-foreground font-medium uppercase tracking-wide">个人训练</p>
+        ) : null}
+        <NavLink to="/my/training" className={navLinkClass}>
+          <ChartColumnStacked className="h-4 w-4" />
+          {!collapsed ? '训练统计' : null}
+        </NavLink>
+        <NavLink to="/my/drills" className={navLinkClass}>
+          <Dumbbell className="h-4 w-4" />
+          {!collapsed ? '个人训练' : null}
+        </NavLink>
+        <NavLink to="/my/replays" className={navLinkClass}>
+          <History className="h-4 w-4" />
+          {!collapsed ? '训练记录' : null}
         </NavLink>
 
         {matchId && (

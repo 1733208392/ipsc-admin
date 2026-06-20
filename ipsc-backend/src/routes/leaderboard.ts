@@ -158,8 +158,9 @@ router.get('/', (req: Request, res: Response) => {
         })
         .filter((item): item is NonNullable<typeof item> => item !== null)
         .sort((a, b) => {
-          if (b.percentage !== a.percentage) return b.percentage - a.percentage;
           if (b.hit_factor !== a.hit_factor) return b.hit_factor - a.hit_factor;
+          if (b.percentage !== a.percentage) return b.percentage - a.percentage;
+          if (b.stage_points_earned !== a.stage_points_earned) return b.stage_points_earned - a.stage_points_earned;
           return String(a.bib_number).localeCompare(String(b.bib_number));
         })
         .map((item, idx) => ({

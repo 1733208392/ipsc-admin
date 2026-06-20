@@ -125,6 +125,7 @@ db.exec(`
     match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
     division_id INTEGER NOT NULL REFERENCES divisions(id),
     squad_id INTEGER REFERENCES squads(id),
+    shooter_uid TEXT,
     name TEXT NOT NULL,
     bib_number TEXT NOT NULL,
     category_code TEXT CHECK(category_code IN ('J','S','SJ','L')),
@@ -132,6 +133,13 @@ db.exec(`
     gender TEXT,
     region TEXT,
     club TEXT,
+    club_id INTEGER REFERENCES clubs(id) ON DELETE SET NULL,
+    "class" TEXT,
+    factor TEXT CHECK(factor IN ('Minor', 'Major')),
+    failed_factor INTEGER DEFAULT 0,
+    disqualified_at DATETIME,
+    absent_at DATETIME,
+    membership_type TEXT DEFAULT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -261,6 +269,13 @@ function getTableColumns(tableName: string): Array<{ name: string; notnull: numb
   return db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string; notnull: number }>;
 }
 
+function getTableSql(tableName: string): string {
+  const row = db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?`)
+    .get(tableName) as { sql: string } | undefined;
+  return row?.sql ?? '';
+}
+
 function ensurePersonalClubColumn() {
   const columns = getTableColumns('clubs');
   if (!columns.some((column) => column.name === 'is_personal')) {
@@ -325,6 +340,108 @@ function ensureDrillTemplateSchema() {
   const afterCount = (db.prepare(`SELECT COUNT(*) AS c FROM drill_templates`).get() as { c: number }).c;
   if (beforeCount !== afterCount) {
     throw new Error(`drill_templates migration row count mismatch: before=${beforeCount} after=${afterCount}`);
+  }
+}
+
+function ensureShooterSchema() {
+  if (!tableExists('shooters')) {
+    return;
+  }
+
+  const columns = getTableColumns('shooters');
+  const columnNames = new Set(columns.map((column) => column.name));
+  const tableSql = getTableSql('shooters');
+  const hasLegacyQuotedFactorCheck = /CHECK\s*\(\s*factor\s+IN\s*\(\s*"Minor"\s*,\s*"Major"\s*\)\s*\)/i.test(tableSql);
+  const failedFactorColumn = columns.find((column) => column.name === 'failed_factor');
+  const failedFactorIsNotNull = failedFactorColumn?.notnull === 1;
+
+  const requiredColumns = [
+    'shooter_uid',
+    'club_id',
+    'class',
+    'factor',
+    'failed_factor',
+    'disqualified_at',
+    'absent_at',
+    'membership_type',
+  ];
+
+  const hasAllRequiredColumns = requiredColumns.every((name) => columnNames.has(name));
+  if (hasAllRequiredColumns && !hasLegacyQuotedFactorCheck && !failedFactorIsNotNull) {
+    return;
+  }
+
+  const copyFactorExpr = columnNames.has('factor')
+    ? `CASE
+         WHEN factor IS NULL THEN NULL
+         WHEN LOWER(factor) = 'major' THEN 'Major'
+         ELSE 'Minor'
+       END`
+    : `NULL`;
+
+  const copyShooterUidExpr = columnNames.has('shooter_uid') ? 'shooter_uid' : 'NULL';
+  const copyClubIdExpr = columnNames.has('club_id') ? 'club_id' : 'NULL';
+  const copyClassExpr = columnNames.has('class') ? '"class"' : 'NULL';
+  const copyFailedFactorExpr = columnNames.has('failed_factor') ? 'failed_factor' : '0';
+  const copyDisqualifiedAtExpr = columnNames.has('disqualified_at') ? 'disqualified_at' : 'NULL';
+  const copyAbsentAtExpr = columnNames.has('absent_at') ? 'absent_at' : 'NULL';
+  const copyMembershipTypeExpr = columnNames.has('membership_type') ? 'membership_type' : 'NULL';
+  const copyCategoryExpr = columnNames.has('category_code')
+    ? `CASE
+         WHEN category_code IS NULL THEN NULL
+         WHEN UPPER(category_code) IN ('J', 'S', 'SJ', 'L') THEN UPPER(category_code)
+         ELSE NULL
+       END`
+    : `NULL`;
+
+  db.exec(`DROP TABLE IF EXISTS shooters_new`);
+  db.exec(`PRAGMA foreign_keys = OFF`);
+  db.exec(`BEGIN TRANSACTION`);
+  try {
+    db.exec(`
+      CREATE TABLE shooters_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        match_id INTEGER NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+        division_id INTEGER NOT NULL REFERENCES divisions(id),
+        squad_id INTEGER REFERENCES squads(id),
+        shooter_uid TEXT,
+        name TEXT NOT NULL,
+        bib_number TEXT NOT NULL,
+        category_code TEXT CHECK(category_code IN ('J','S','SJ','L')),
+        age INTEGER,
+        gender TEXT,
+        region TEXT,
+        club TEXT,
+        club_id INTEGER REFERENCES clubs(id) ON DELETE SET NULL,
+        "class" TEXT,
+        factor TEXT CHECK(factor IN ('Minor', 'Major')),
+        failed_factor INTEGER DEFAULT 0,
+        disqualified_at DATETIME,
+        absent_at DATETIME,
+        membership_type TEXT DEFAULT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    `);
+    db.exec(`
+      INSERT INTO shooters_new (
+        id, match_id, division_id, squad_id, shooter_uid, name, bib_number, category_code,
+        age, gender, region, club, club_id, "class", factor, failed_factor,
+        disqualified_at, absent_at, membership_type, created_at
+      )
+      SELECT
+        id, match_id, division_id, squad_id, ${copyShooterUidExpr}, name, bib_number, ${copyCategoryExpr},
+        age, gender, region, club, ${copyClubIdExpr}, ${copyClassExpr}, ${copyFactorExpr}, ${copyFailedFactorExpr},
+        ${copyDisqualifiedAtExpr}, ${copyAbsentAtExpr}, ${copyMembershipTypeExpr}, COALESCE(created_at, datetime('now'))
+      FROM shooters
+    `);
+    db.exec(`DROP TABLE shooters`);
+    db.exec(`ALTER TABLE shooters_new RENAME TO shooters`);
+    db.exec(`COMMIT`);
+  } catch (err) {
+    db.exec(`ROLLBACK`);
+    throw err;
+  } finally {
+    db.exec(`PRAGMA foreign_keys = ON`);
   }
 }
 
@@ -424,6 +541,7 @@ function ensureDrillReplaySchema() {
 }
 
 ensurePersonalClubColumn();
+ensureShooterSchema();
 ensureDrillTemplateSchema();
 ensureDrillReplaySchema();
 
@@ -545,10 +663,31 @@ if (!existingShooterColumns.has('region')) {
 if (!existingShooterColumns.has('club')) {
   db.exec(`ALTER TABLE shooters ADD COLUMN club TEXT`);
 }
+if (!existingShooterColumns.has('club_id')) {
+  db.exec(`ALTER TABLE shooters ADD COLUMN club_id INTEGER`);
+}
 if (!existingShooterColumns.has('category_code')) {
   db.exec(`ALTER TABLE shooters ADD COLUMN category_code TEXT`);
   db.exec(`UPDATE shooters SET category_code = UPPER(category_code) WHERE category_code IS NOT NULL`);
   db.exec(`UPDATE shooters SET category_code = NULL WHERE category_code NOT IN ('J','S','SJ','L')`);
+}
+if (!existingShooterColumns.has('class')) {
+  db.exec(`ALTER TABLE shooters ADD COLUMN "class" TEXT`);
+}
+if (!existingShooterColumns.has('factor')) {
+  db.exec(`ALTER TABLE shooters ADD COLUMN factor TEXT CHECK(factor IN ('Minor', 'Major'))`);
+}
+if (!existingShooterColumns.has('failed_factor')) {
+  db.exec(`ALTER TABLE shooters ADD COLUMN failed_factor INTEGER DEFAULT 0`);
+}
+if (!existingShooterColumns.has('disqualified_at')) {
+  db.exec(`ALTER TABLE shooters ADD COLUMN disqualified_at DATETIME`);
+}
+if (!existingShooterColumns.has('absent_at')) {
+  db.exec(`ALTER TABLE shooters ADD COLUMN absent_at DATETIME`);
+}
+if (!existingShooterColumns.has('membership_type')) {
+  db.exec(`ALTER TABLE shooters ADD COLUMN membership_type TEXT DEFAULT NULL`);
 }
 
 shooterColumns = getShooterColumns();

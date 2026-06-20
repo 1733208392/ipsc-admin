@@ -128,10 +128,10 @@ export function calculateStageRanking(matchId, stageId, divisionId, categoryFilt
         });
     }
     ranked.sort((a, b) => {
-        if (b.percentage !== a.percentage)
-            return b.percentage - a.percentage;
         if (b.hit_factor !== a.hit_factor)
             return b.hit_factor - a.hit_factor;
+        if (b.percentage !== a.percentage)
+            return b.percentage - a.percentage;
         if (b.stage_points_earned !== a.stage_points_earned)
             return b.stage_points_earned - a.stage_points_earned;
         return a.shooter_id - b.shooter_id;

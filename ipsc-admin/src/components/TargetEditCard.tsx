@@ -79,6 +79,10 @@ export function TargetEditCard({ value, onChange, onDelete, onMoveUp, onMoveDown
               <p className="text-xs text-muted-foreground">
                 {value.target_name.trim() || '未命名靶位'}
                 {value.target_type.length > 0 ? ` · ${value.target_variant?.length ?? 0} 个停留时长` : ''}
+                {' · '}
+                timeout {value.timeout}s
+                {' · '}
+                sort_order {value.sort_order}
               </p>
             </div>
           </div>
@@ -109,6 +113,23 @@ export function TargetEditCard({ value, onChange, onDelete, onMoveUp, onMoveDown
               onChange={(event) => onChange({ ...value, target_name: event.target.value })}
               placeholder="例如 Paper A"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>timeout（秒）</Label>
+              <Input
+                type="number"
+                min={0}
+                value={value.timeout}
+                onChange={(event) => onChange({ ...value, timeout: Number(event.target.value) || 0 })}
+                placeholder="0"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>sort_order</Label>
+              <Input value={value.sort_order} disabled />
+            </div>
           </div>
 
           <div className="space-y-2">

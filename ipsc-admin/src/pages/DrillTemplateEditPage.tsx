@@ -53,6 +53,8 @@ export function DrillTemplateEditPage() {
   const [match, setMatch] = useState<Match | null>(null)
   const [stage, setStage] = useState<Stage | null>(null)
   const [templateName, setTemplateName] = useState('')
+  const [templateTimeout, setTemplateTimeout] = useState(1200)
+  const [templateSortOrder, setTemplateSortOrder] = useState(0)
   const [targets, setTargets] = useState<DrillTargetDraft[]>([createEmptyDrillTarget(1)])
 
   const title = useMemo(() => (isNew ? '新建 Drill' : '编辑 Drill'), [isNew])
@@ -73,9 +75,13 @@ export function DrillTemplateEditPage() {
 
       if (drillData) {
         setTemplateName(drillData.name)
+        setTemplateTimeout(drillData.timeout)
+        setTemplateSortOrder(drillData.sort_order)
         setTargets(draftFromDetail(drillData))
       } else {
         setTemplateName('')
+        setTemplateTimeout(1200)
+        setTemplateSortOrder(0)
         setTargets([createEmptyDrillTarget(1)])
       }
     } catch (error) {
@@ -152,7 +158,8 @@ export function DrillTemplateEditPage() {
     try {
       const payload = {
         name,
-        sort_order: 0,
+        timeout: templateTimeout,
+        sort_order: templateSortOrder,
         targets: renumberTargets(targets).map((target) => ({
           seq_no: target.seq_no,
           target_name: target.target_name,
@@ -170,6 +177,7 @@ export function DrillTemplateEditPage() {
       } else {
         await api.put(`/drills/${drillId}`, {
           name: payload.name,
+          timeout: payload.timeout,
           sort_order: payload.sort_order,
         })
         await api.put(`/drills/${drillId}/targets`, { targets: payload.targets })
@@ -215,6 +223,40 @@ export function DrillTemplateEditPage() {
               <div className="space-y-2">
                 <Label>模板名称</Label>
                 <Input value={templateName} onChange={(event) => setTemplateName(event.target.value)} placeholder="例如 Stage1-标准IPSC" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>超时时间（秒）</Label>
+                  <Input type="number" min={1} max={9999} value={templateTimeout} onChange={(event) => setTemplateTimeout(Number(event.target.value) || 0)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>排序</Label>
+                  <Input type="number" value={templateSortOrder} onChange={(event) => setTemplateSortOrder(Number(event.target.value) || 0)} />
+                </div>
+              </div>
+              <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">JSON 预览</p>
+                    <p className="text-xs text-muted-foreground">以下内容会同步到后端并用于 iOS 拉取。</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{targets.length} 个靶位</span>
+                </div>
+                <pre className="overflow-auto rounded bg-background p-3 text-xs leading-5 text-muted-foreground">{JSON.stringify({
+                  name: templateName || '',
+                  timeout: templateTimeout,
+                  sort_order: templateSortOrder,
+                  targets: renumberTargets(targets).map((target) => ({
+                    seq_no: target.seq_no,
+                    target_name: target.target_name,
+                    target_type: target.target_type,
+                    timeout: target.timeout,
+                    counted_shots: target.counted_shots,
+                    target_variant: target.target_variant,
+                    has_physical_popper: target.has_physical_popper,
+                    sort_order: target.sort_order,
+                  })),
+                }, null, 2)}</pre>
               </div>
             </CardContent>
           </Card>

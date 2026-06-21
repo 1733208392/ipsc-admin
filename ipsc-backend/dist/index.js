@@ -19,20 +19,50 @@ import myDrillsRouter from './routes/my-drills.js';
 import myReplaysRouter from './routes/my-replays.js';
 import adminRouter from './routes/admin.js';
 import { getUploadsDir } from './services/stage-files.js';
+import otaRouter from './routes/ota.js';
+import adminOtaRouter from './routes/admin-ota.js';
+import { getOtaFilesDir } from './services/ota.js';
 const app = express();
 const PORT = process.env['PORT'] ? Number(process.env['PORT']) : 3001;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.resolve(__dirname, '..', getUploadsDir());
+const otaFilesDir = getOtaFilesDir();
 // ── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(uploadsDir));
+app.use('/ota/files', (req, res, next) => {
+    if (!req.path.toLowerCase().endsWith('.zip')) {
+        res.status(403).json({ success: false, error: 'Only .zip files are accessible' });
+        return;
+    }
+    next();
+}, express.static(otaFilesDir, {
+    index: false,
+    setHeaders: (res, filePath) => {
+        const fileName = path.basename(filePath);
+        res.setHeader('Content-Type', 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+    },
+}));
 // ── Routes ───────────────────────────────────────────────────────────────────
 const api = express.Router();
 // Auth
 api.use('/auth', authRouter);
+// Public OTA API for target devices
+api.use('/ota', otaRouter);
 // All routes below require authentication.
 api.use(authMiddleware);
+const requireSuperAdmin = (req, res, next) => {
+    const user = req.user;
+    if (!user || user.role !== 'super_admin') {
+        res.status(403).json({ success: false, error: 'Forbidden: superadmin role required' });
+        return;
+    }
+    next();
+};
 // Matches
 api.use('/matches', matchesRouter);
 // Divisions (nested + top-level)
@@ -80,14 +110,8 @@ api.use(drillsRouter);
 api.use('/my', myDrillsRouter);
 api.use('/my', myReplaysRouter);
 // Admin (superadmin role required)
-api.use('/admin', (req, res, next) => {
-    const user = req.user;
-    if (!user || user.role !== 'super_admin') {
-        res.status(403).json({ success: false, error: 'Forbidden: superadmin role required' });
-        return;
-    }
-    next();
-}, adminRouter);
+api.use('/admin/ota', adminOtaRouter);
+api.use('/admin', requireSuperAdmin, adminRouter);
 app.use('/api/v1', api);
 // ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((_req, res) => {

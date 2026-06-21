@@ -31,10 +31,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
   })
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    const message = (err as { error?: string; message?: string }).error
-      || (err as { error?: string; message?: string }).message
-      || `HTTP ${res.status}`
+    const contentType = res.headers.get('content-type') || ''
+    let message = `HTTP ${res.status}`
+
+    if (contentType.includes('application/json')) {
+      const err = await res.json().catch(() => ({})) as { error?: string; message?: string }
+      message = err.error || err.message || message
+    } else {
+      const text = await res.text().catch(() => '')
+      if (text.trim()) {
+        message = `${message}: ${text.slice(0, 200)}`
+      }
+    }
+
     throw new Error(message)
   }
   const json = await res.json()

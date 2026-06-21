@@ -24,6 +24,7 @@ import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { AdminClubsPage } from '@/pages/AdminClubsPage'
 import { AdminUsersPage } from '@/pages/AdminUsersPage'
 import { AdminMatchesPage } from '@/pages/AdminMatchesPage'
+import { AdminOtaPage } from '@/pages/AdminOtaPage'
 import { MyDrillListPage } from '@/pages/my/MyDrillListPage'
 import { MyDrillEditPage } from '@/pages/my/MyDrillEditPage'
 import { MyReplaysPage } from '@/pages/my/MyReplaysPage'
@@ -106,6 +107,14 @@ export default function App() {
                 element={
                   <RequireSuperAdmin>
                     <AdminMatchesPage />
+                  </RequireSuperAdmin>
+                }
+              />
+              <Route
+                path="/admin/ota"
+                element={
+                  <RequireSuperAdmin>
+                    <AdminOtaPage />
                   </RequireSuperAdmin>
                 }
               />

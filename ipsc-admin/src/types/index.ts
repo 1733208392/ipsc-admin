@@ -50,6 +50,31 @@ export interface LoginResult {
   expires_in?: number
 }
 
+export type OtaPackageStatus = 'draft' | 'published' | 'archived'
+
+export interface OtaPackage {
+  id: number
+  version: string
+  notes: string
+  filename: string
+  original_filename: string
+  size_bytes: number
+  checksum: string
+  address: string
+  status: OtaPackageStatus
+  is_latest: number
+  created_by: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OtaPackageListResult {
+  total_count: number
+  page: number
+  limit: number
+  rows: OtaPackage[]
+}
+
 export interface GlobalShooter {
   uid: string
   name: string

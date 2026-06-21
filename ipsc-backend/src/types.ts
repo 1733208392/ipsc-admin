@@ -233,6 +233,37 @@ export const PhoneResetPasswordSchema = z.object({
   new_password: passwordSchema(),
 });
 
+// ── OTA schemas ──────────────────────────────────────────────────────────────
+export const OtaPublicRequestSchema = z.object({
+  auth_data: z.string().optional().default(''),
+});
+
+export const OtaHistoryRequestSchema = z.object({
+  auth_data: z.string().optional().default(''),
+  page: z.number().int().min(1).optional().default(1),
+  limit: z.number().int().min(1).max(50).optional().default(30),
+});
+
+export const OtaPackageStatusSchema = z.enum(['draft', 'published', 'archived']);
+
+export const OtaCreatePackageSchema = z.object({
+  version: z.string().regex(/^\d+\.\d+\.\d+$/, 'version must be x.y.z'),
+  notes: z.string().optional().default(''),
+  status: OtaPackageStatusSchema.optional().default('draft'),
+});
+
+export const OtaUpdatePackageSchema = z.object({
+  notes: z.string().optional(),
+  status: OtaPackageStatusSchema.optional(),
+  is_latest: z.boolean().optional(),
+});
+
+export const OtaAdminListQuerySchema = z.object({
+  status: OtaPackageStatusSchema.optional(),
+  page: z.number().int().min(1).optional().default(1),
+  limit: z.number().int().min(1).max(50).optional().default(20),
+});
+
 export const CreateGlobalShooterSchema = z.object({
   name: z.string().min(1),
   gender: z.enum(['male', 'female']),
@@ -384,6 +415,11 @@ export type PhoneRegisterInput = z.infer<typeof PhoneRegisterSchema>;
 export type PhoneVerifyInput = z.infer<typeof PhoneVerifySchema>;
 export type PhoneLoginInput = z.infer<typeof PhoneLoginSchema>;
 export type PhoneResetPasswordInput = z.infer<typeof PhoneResetPasswordSchema>;
+export type OtaPublicRequestInput = z.infer<typeof OtaPublicRequestSchema>;
+export type OtaHistoryRequestInput = z.infer<typeof OtaHistoryRequestSchema>;
+export type OtaCreatePackageInput = z.infer<typeof OtaCreatePackageSchema>;
+export type OtaUpdatePackageInput = z.infer<typeof OtaUpdatePackageSchema>;
+export type OtaAdminListQueryInput = z.infer<typeof OtaAdminListQuerySchema>;
 export type CreateGlobalShooter = z.infer<typeof CreateGlobalShooterSchema>;
 export type UpdateGlobalShooter = z.infer<typeof UpdateGlobalShooterSchema>;
 export type ChangeSquad = z.infer<typeof ChangeSquadSchema>;

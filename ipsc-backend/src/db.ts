@@ -256,6 +256,28 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_drill_templates_stage ON drill_templates(stage_id);
   CREATE INDEX IF NOT EXISTS idx_drill_templates_match ON drill_templates(match_id);
   CREATE INDEX IF NOT EXISTS idx_drill_targets_template ON drill_template_targets(template_id);
+
+  CREATE TABLE IF NOT EXISTS ota_packages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    version TEXT NOT NULL UNIQUE,
+    notes TEXT NOT NULL DEFAULT '',
+    filename TEXT NOT NULL,
+    original_filename TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    checksum TEXT NOT NULL,
+    address TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','published','archived')),
+    is_latest INTEGER NOT NULL DEFAULT 0,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_ota_packages_status ON ota_packages(status);
+  CREATE INDEX IF NOT EXISTS idx_ota_packages_created_at ON ota_packages(created_at);
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_ota_packages_latest_unique
+    ON ota_packages(is_latest)
+    WHERE is_latest = 1;
 `);
 
 function tableExists(tableName: string): boolean {

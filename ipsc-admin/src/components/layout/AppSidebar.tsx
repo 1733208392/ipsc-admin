@@ -1,5 +1,5 @@
 import { NavLink, useParams } from 'react-router-dom'
-import { Target, List, Users, Layers, Group, Trophy, LogOut, Building2, UserCog, Shield, FileText, FileCheck, Activity, Radio, Dumbbell, History, ChartColumnStacked } from 'lucide-react'
+import { Target, List, Users, Layers, Group, Trophy, LogOut, Building2, UserCog, Shield, FileText, FileCheck, Activity, Radio, Dumbbell, History, ChartColumnStacked, UploadCloud } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMatch } from '@/hooks/useMatch'
 import { Separator } from '@/components/ui/separator'
@@ -41,6 +41,10 @@ export function AppSidebar({ collapsed = false }: { collapsed?: boolean }) {
             <NavLink to="/admin/matches" className={navLinkClass}>
               <Shield className="h-4 w-4" />
               {!collapsed ? '全平台赛事' : null}
+            </NavLink>
+            <NavLink to="/admin/ota" className={navLinkClass}>
+              <UploadCloud className="h-4 w-4" />
+              {!collapsed ? 'OTA 管理' : null}
             </NavLink>
             <Separator className="my-2" />
           </>

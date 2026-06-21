@@ -455,7 +455,7 @@ export const DrillReplayUploadSchema = z.object({
 
 export type DrillReplayUploadInput = z.infer<typeof DrillReplayUploadSchema>;
 
-export const PersonalDrillReplayUploadSchema = z.object({
+export const PersonalDrillRecordUploadSchema = z.object({
   total_time: z.number().min(0).optional().default(0),
   num_shots: z.number().int().min(0).optional().default(0),
   score: z.number().int().optional(),
@@ -464,7 +464,7 @@ export const PersonalDrillReplayUploadSchema = z.object({
   payload: z.record(z.string(), z.unknown()),
 });
 
-export type PersonalDrillReplayUploadInput = z.infer<typeof PersonalDrillReplayUploadSchema>;
+export type PersonalDrillRecordUploadInput = z.infer<typeof PersonalDrillRecordUploadSchema>;
 
 // ── Drill Templates ──────────────────────────────────────────────────────────
 export const VALID_DRILL_TARGET_TYPES = [

@@ -18,7 +18,7 @@ export function MyReplayDetailPage() {
     if (!id) return
     setLoading(true)
     try {
-      const data = await api.get<PersonalReplayDetail>(`/my/replays/${id}`)
+      const data = await api.get<PersonalReplayDetail>(`/my/drill-records/${id}`)
       setReplay(data)
     } catch (error) {
       toast({ title: '加载失败', description: String(error), variant: 'destructive' })
@@ -34,9 +34,9 @@ export function MyReplayDetailPage() {
   async function handleDelete() {
     if (!id) return
     try {
-      await api.delete(`/my/replays/${id}`)
+      await api.delete(`/my/drill-records/${id}`)
       toast({ title: '删除成功' })
-      navigate('/my/replays')
+      navigate('/my/drill-records')
     } catch (error) {
       toast({ title: '删除失败', description: String(error), variant: 'destructive' })
     }
@@ -50,7 +50,7 @@ export function MyReplayDetailPage() {
           <p className="text-sm text-muted-foreground">查看个人训练的完整回放数据。</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate('/my/replays')}>返回</Button>
+          <Button variant="outline" onClick={() => navigate('/my/drill-records')}>返回</Button>
           <Button variant="destructive" onClick={() => void handleDelete()} disabled={!replay}>删除</Button>
         </div>
       </div>

@@ -1,10 +1,10 @@
 import { Router, Request, Response } from 'express';
 import db from '../db.js';
-import { PersonalDrillReplayUploadSchema, ok, fail } from '../types.js';
+import { PersonalDrillRecordUploadSchema, ok, fail } from '../types.js';
 
 const router = Router();
 
-interface PersonalReplayRow {
+interface PersonalDrillRecordRow {
   id: number;
   match_id: number | null;
   shooter_id: number | null;
@@ -47,7 +47,7 @@ function getTemplateByOwner(ownerUserId: number, templateId: number) {
     .get(templateId, ownerUserId) as { id: number; owner_user_id: number; name: string } | undefined;
 }
 
-function serializeReplay(row: PersonalReplayRow) {
+function serializeDrillRecord(row: PersonalDrillRecordRow) {
   return {
     id: row.id,
     match_id: row.match_id,
@@ -67,7 +67,7 @@ function serializeReplay(row: PersonalReplayRow) {
   };
 }
 
-function serializeReplaySummary(row: PersonalReplayRow) {
+function serializeDrillRecordSummary(row: PersonalDrillRecordRow) {
   return {
     id: row.id,
     drill_template_id: row.drill_template_id,
@@ -79,7 +79,7 @@ function serializeReplaySummary(row: PersonalReplayRow) {
   };
 }
 
-router.post(['/drills/:drillId/drill-records', '/drills/:drillId/replays'], (req: Request, res: Response) => {
+router.post('/drills/:drillId/drill-records', (req: Request, res: Response) => {
   if (!req.user) {
     res.status(401).json(fail('未登录'));
     return;
@@ -97,7 +97,7 @@ router.post(['/drills/:drillId/drill-records', '/drills/:drillId/replays'], (req
     return;
   }
 
-  const parsed = PersonalDrillReplayUploadSchema.safeParse(req.body);
+  const parsed = PersonalDrillRecordUploadSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json(fail(parsed.error.message));
     return;
@@ -106,7 +106,7 @@ router.post(['/drills/:drillId/drill-records', '/drills/:drillId/replays'], (req
   try {
     const payloadJson = JSON.stringify(parsed.data.payload);
     const uploadedBy = req.user.id;
-    let replayId: number | null = null;
+    let recordId: number | null = null;
 
     if (parsed.data.client_drill_result_id) {
       const existing = db
@@ -134,11 +134,11 @@ router.post(['/drills/:drillId/drill-records', '/drills/:drillId/replays'], (req
           existing.id,
           req.user.id
         );
-        replayId = existing.id;
+        recordId = existing.id;
       }
     }
 
-    if (replayId === null) {
+    if (recordId === null) {
       const info = db
         .prepare(
           `INSERT INTO drill_replays
@@ -158,7 +158,7 @@ router.post(['/drills/:drillId/drill-records', '/drills/:drillId/replays'], (req
           parsed.data.device_id ?? null,
           uploadedBy
         );
-      replayId = Number(info.lastInsertRowid);
+      recordId = Number(info.lastInsertRowid);
     }
 
     const row = db
@@ -168,20 +168,20 @@ router.post(['/drills/:drillId/drill-records', '/drills/:drillId/replays'], (req
          LEFT JOIN drill_templates dt ON dt.id = r.drill_template_id
          WHERE r.id = ? AND r.owner_user_id = ?`
       )
-      .get(replayId, req.user.id) as PersonalReplayRow | undefined;
+      .get(recordId, req.user.id) as PersonalDrillRecordRow | undefined;
 
     if (!row) {
       res.status(500).json(fail('Failed to load saved drill record'));
       return;
     }
 
-    res.json(ok(serializeReplay(row)));
+    res.json(ok(serializeDrillRecord(row)));
   } catch (err) {
     res.status(500).json(fail(String(err)));
   }
 });
 
-router.get(['/drills/:drillId/drill-records', '/drills/:drillId/replays'], (req: Request, res: Response) => {
+router.get('/drills/:drillId/drill-records', (req: Request, res: Response) => {
   if (!req.user) {
     res.status(401).json(fail('未登录'));
     return;
@@ -217,10 +217,10 @@ router.get(['/drills/:drillId/drill-records', '/drills/:drillId/replays'], (req:
          ORDER BY r.created_at DESC, r.id DESC
          LIMIT ? OFFSET ?`
       )
-      .all(req.user.id, drillId, pageSize, offset) as PersonalReplayRow[];
+      .all(req.user.id, drillId, pageSize, offset) as PersonalDrillRecordRow[];
 
     res.json(ok({
-      items: items.map(serializeReplaySummary),
+      items: items.map(serializeDrillRecordSummary),
       total,
       page,
       pageSize,
@@ -230,7 +230,7 @@ router.get(['/drills/:drillId/drill-records', '/drills/:drillId/replays'], (req:
   }
 });
 
-router.get(['/drill-records/stats', '/replays/stats'], (req: Request, res: Response) => {
+router.get('/drill-records/stats', (req: Request, res: Response) => {
   if (!req.user) {
     res.status(401).json(fail('未登录'));
     return;
@@ -245,7 +245,7 @@ router.get(['/drill-records/stats', '/replays/stats'], (req: Request, res: Respo
     const totals = db
       .prepare(
         `SELECT
-          COUNT(*) AS total_replays,
+          COUNT(*) AS total_records,
           COALESCE(SUM(num_shots), 0) AS total_shots,
           COALESCE(AVG(total_time), 0) AS avg_time,
           COALESCE(MIN(total_time), 0) AS best_time,
@@ -254,7 +254,7 @@ router.get(['/drill-records/stats', '/replays/stats'], (req: Request, res: Respo
          WHERE owner_user_id = ? AND created_at >= ?`
       )
       .get(req.user.id, sinceIso) as {
-      total_replays: number;
+      total_records: number;
       total_shots: number;
       avg_time: number;
       best_time: number;
@@ -266,7 +266,7 @@ router.get(['/drill-records/stats', '/replays/stats'], (req: Request, res: Respo
         `SELECT
           r.drill_template_id,
           COALESCE(dt.name, r.drill_name, '') AS drill_name,
-          COUNT(*) AS replay_count,
+          COUNT(*) AS record_count,
           COALESCE(AVG(r.total_time), 0) AS avg_time,
           COALESCE(MIN(r.total_time), 0) AS best_time,
           COALESCE(AVG(r.score), 0) AS avg_score
@@ -274,12 +274,12 @@ router.get(['/drill-records/stats', '/replays/stats'], (req: Request, res: Respo
          LEFT JOIN drill_templates dt ON dt.id = r.drill_template_id
          WHERE r.owner_user_id = ? AND r.created_at >= ?
          GROUP BY r.drill_template_id, drill_name
-         ORDER BY replay_count DESC, drill_name ASC`
+         ORDER BY record_count DESC, drill_name ASC`
       )
       .all(req.user.id, sinceIso) as Array<{
       drill_template_id: number;
       drill_name: string;
-      replay_count: number;
+      record_count: number;
       avg_time: number;
       best_time: number;
       avg_score: number;
@@ -296,7 +296,7 @@ router.get(['/drill-records/stats', '/replays/stats'], (req: Request, res: Respo
       .all(req.user.id, sinceIso) as Array<{ date: string; count: number; avg_time: number }>;
 
     res.json(ok({
-      total_replays: totals.total_replays,
+      total_records: totals.total_records,
       total_shots: totals.total_shots,
       avg_time: totals.avg_time,
       best_time: totals.best_time,
@@ -309,7 +309,7 @@ router.get(['/drill-records/stats', '/replays/stats'], (req: Request, res: Respo
   }
 });
 
-router.get(['/drill-records', '/replays'], (req: Request, res: Response) => {
+router.get('/drill-records', (req: Request, res: Response) => {
   if (!req.user) {
     res.status(401).json(fail('未登录'));
     return;
@@ -346,10 +346,10 @@ router.get(['/drill-records', '/replays'], (req: Request, res: Response) => {
          ORDER BY r.created_at DESC, r.id DESC
          LIMIT ? OFFSET ?`
       )
-      .all(...params, pageSize, offset) as PersonalReplayRow[];
+      .all(...params, pageSize, offset) as PersonalDrillRecordRow[];
 
     res.json(ok({
-      items: items.map(serializeReplaySummary),
+      items: items.map(serializeDrillRecordSummary),
       total,
       page,
       pageSize,
@@ -359,7 +359,7 @@ router.get(['/drill-records', '/replays'], (req: Request, res: Response) => {
   }
 });
 
-router.get(['/drill-records/:id', '/replays/:id'], (req: Request, res: Response) => {
+router.get('/drill-records/:id', (req: Request, res: Response) => {
   if (!req.user) {
     res.status(401).json(fail('未登录'));
     return;
@@ -379,20 +379,20 @@ router.get(['/drill-records/:id', '/replays/:id'], (req: Request, res: Response)
          LEFT JOIN drill_templates dt ON dt.id = r.drill_template_id
          WHERE r.id = ? AND r.owner_user_id = ?`
       )
-      .get(id, req.user.id) as PersonalReplayRow | undefined;
+      .get(id, req.user.id) as PersonalDrillRecordRow | undefined;
 
     if (!row) {
       res.status(404).json(fail('Drill record not found'));
       return;
     }
 
-    res.json(ok(serializeReplay(row)));
+    res.json(ok(serializeDrillRecord(row)));
   } catch (err) {
     res.status(500).json(fail(String(err)));
   }
 });
 
-router.delete(['/drill-records/:id', '/replays/:id'], (req: Request, res: Response) => {
+router.delete('/drill-records/:id', (req: Request, res: Response) => {
   if (!req.user) {
     res.status(401).json(fail('未登录'));
     return;

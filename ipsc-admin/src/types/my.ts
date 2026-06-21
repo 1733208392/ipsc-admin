@@ -9,8 +9,8 @@ export interface PersonalDrillTemplate {
   created_at: string
   updated_at: string
   targets_count?: number
-  replay_count?: number
-  last_replay_at?: string | null
+  record_count?: number
+  last_record_at?: string | null
 }
 
 export interface PersonalDrillTarget {
@@ -52,7 +52,7 @@ export interface PersonalReplayDetail extends PersonalReplaySummary {
 }
 
 export interface TrainingStats {
-  total_replays: number
+  total_records: number
   total_shots: number
   avg_time: number
   best_time: number
@@ -60,7 +60,7 @@ export interface TrainingStats {
   by_drill: Array<{
     drill_template_id: number | null
     drill_name: string
-    replay_count: number
+    record_count: number
     avg_time: number
     best_time: number
     avg_score: number

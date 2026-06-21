@@ -138,7 +138,7 @@ export function MyDrillListPage() {
                   <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">{template.targets_count ?? 0} 个靶位</span>
                 </div>
                 <p className="text-sm text-muted-foreground">超时时间 {template.timeout} 秒 · 排序 {template.sort_order}</p>
-                <p className="text-xs text-muted-foreground">训练次数 {template.replay_count ?? 0} · 最近训练 {template.last_replay_at ?? '暂无'}</p>
+                <p className="text-xs text-muted-foreground">训练次数 {template.record_count ?? 0} · 最近训练 {template.last_record_at ?? '暂无'}</p>
               </CardHeader>
               <CardContent className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex gap-2">

@@ -356,7 +356,7 @@ export const DrillReplayUploadSchema = z.object({
     // requiring backend changes.
     payload: z.record(z.string(), z.unknown()),
 });
-export const PersonalDrillReplayUploadSchema = z.object({
+export const PersonalDrillRecordUploadSchema = z.object({
     total_time: z.number().min(0).optional().default(0),
     num_shots: z.number().int().min(0).optional().default(0),
     score: z.number().int().optional(),

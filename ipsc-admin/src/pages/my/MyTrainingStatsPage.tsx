@@ -21,7 +21,7 @@ export function MyTrainingStatsPage() {
   async function load() {
     setLoading(true)
     try {
-      const data = await api.get<TrainingStats>(`/my/replays/stats?days=${days}`)
+      const data = await api.get<TrainingStats>(`/my/drill-records/stats?days=${days}`)
       setStats(data)
     } catch (error) {
       toast({ title: '加载失败', description: String(error), variant: 'destructive' })
@@ -56,7 +56,7 @@ export function MyTrainingStatsPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">总次数</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{stats?.total_replays ?? 0}</CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">总次数</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{stats?.total_records ?? 0}</CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">总弹数</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{stats?.total_shots ?? 0}</CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">平均用时</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{stats?.avg_time?.toFixed(2) ?? '0.00'}</CardContent></Card>
         <Card><CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">最佳用时</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{stats?.best_time?.toFixed(2) ?? '0.00'}</CardContent></Card>
@@ -74,7 +74,7 @@ export function MyTrainingStatsPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-medium">{item.drill_name}</p>
-                      <p className="text-xs text-muted-foreground">{item.replay_count} 次 · 平均 {item.avg_time.toFixed(2)} s · 最佳 {item.best_time.toFixed(2)} s</p>
+                      <p className="text-xs text-muted-foreground">{item.record_count} 次 · 平均 {item.avg_time.toFixed(2)} s · 最佳 {item.best_time.toFixed(2)} s</p>
                     </div>
                     <span className="text-sm font-semibold">{item.avg_score.toFixed(1)}</span>
                   </div>

@@ -125,8 +125,8 @@ function serializeTemplateSummary(row) {
         created_at: row.created_at,
         updated_at: row.updated_at,
         targets_count: row.targets_count,
-        replay_count: row.replay_count,
-        last_replay_at: row.last_replay_at,
+        record_count: row.record_count,
+        last_record_at: row.last_record_at,
     };
 }
 function serializeTemplateDetail(row) {
@@ -174,8 +174,8 @@ router.get('/drills', (req, res) => {
             .prepare(`SELECT
           dt.*,
           (SELECT COUNT(*) FROM drill_template_targets dtt WHERE dtt.template_id = dt.id) AS targets_count,
-          (SELECT COUNT(*) FROM drill_replays dr WHERE dr.drill_template_id = dt.id AND dr.owner_user_id = dt.owner_user_id) AS replay_count,
-          (SELECT MAX(created_at) FROM drill_replays dr WHERE dr.drill_template_id = dt.id AND dr.owner_user_id = dt.owner_user_id) AS last_replay_at
+          (SELECT COUNT(*) FROM drill_replays dr WHERE dr.drill_template_id = dt.id AND dr.owner_user_id = dt.owner_user_id) AS record_count,
+          (SELECT MAX(created_at) FROM drill_replays dr WHERE dr.drill_template_id = dt.id AND dr.owner_user_id = dt.owner_user_id) AS last_record_at
          FROM drill_templates dt
          WHERE dt.owner_user_id = ?
          ORDER BY dt.sort_order, dt.id DESC`)

@@ -83,8 +83,8 @@ export default function App() {
               <Route path="/matches/:id/leaderboard-live" element={<LeaderboardLivestreamPage />} />
               <Route path="/my/drills" element={<MyDrillListPage />} />
               <Route path="/my/drills/:drillId" element={<MyDrillEditPage />} />
-              <Route path="/my/replays" element={<MyReplaysPage />} />
-              <Route path="/my/replays/:id" element={<MyReplayDetailPage />} />
+              <Route path="/my/drill-records" element={<MyReplaysPage />} />
+              <Route path="/my/drill-records/:id" element={<MyReplayDetailPage />} />
               <Route path="/my/training" element={<MyTrainingStatsPage />} />
               <Route
                 path="/admin/clubs"

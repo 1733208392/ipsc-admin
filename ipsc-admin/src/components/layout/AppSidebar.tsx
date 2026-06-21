@@ -67,7 +67,7 @@ export function AppSidebar({ collapsed = false }: { collapsed?: boolean }) {
           <Dumbbell className="h-4 w-4" />
           {!collapsed ? '个人训练' : null}
         </NavLink>
-        <NavLink to="/my/replays" className={navLinkClass}>
+        <NavLink to="/my/drill-records" className={navLinkClass}>
           <History className="h-4 w-4" />
           {!collapsed ? '训练记录' : null}
         </NavLink>

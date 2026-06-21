@@ -16,7 +16,7 @@ import stageAttachmentsRouter from './routes/stage-attachments.js';
 import drillReplaysRouter, { getDrillReplay, deleteDrillReplay } from './routes/drill-replays.js';
 import drillsRouter from './routes/drills.js';
 import myDrillsRouter from './routes/my-drills.js';
-import myReplaysRouter from './routes/my-replays.js';
+import myDrillRecordsRouter from './routes/my-drill-records.js';
 import adminRouter from './routes/admin.js';
 import { getUploadsDir } from './services/stage-files.js';
 import otaRouter from './routes/ota.js';
@@ -108,7 +108,7 @@ api.delete('/drill-replays/:id', deleteDrillReplay);
 // Drill Templates
 api.use(drillsRouter);
 api.use('/my', myDrillsRouter);
-api.use('/my', myReplaysRouter);
+api.use('/my', myDrillRecordsRouter);
 // Admin (superadmin role required)
 api.use('/admin/ota', adminOtaRouter);
 api.use('/admin', requireSuperAdmin, adminRouter);

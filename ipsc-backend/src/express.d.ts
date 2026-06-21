@@ -9,6 +9,11 @@ declare global {
       club_id: number | null;
       name: string;
       phone: string | null;
+      email: string | null;
+      email_verified_at: string | null;
+      phone_verified_at: string | null;
+      avatar_url: string | null;
+      locale: string;
       status: 'active' | 'inactive';
       created_at: string;
       updated_at: string;

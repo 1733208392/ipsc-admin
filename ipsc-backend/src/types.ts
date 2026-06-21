@@ -158,11 +158,79 @@ export const UpdateUserSchema = z.object({
   status: z.enum(['active', 'inactive']).optional(),
 });
 
+// Legacy username-based register (kept for backward compatibility)
 export const RegisterSchema = z.object({
   username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_]+$/, '用户名只能包含字母、数字、下划线'),
-  password: z.string().min(6).max(50),
+  password: passwordSchema(),
   name: z.string().min(1).max(50),
   phone: z.string().optional(),
+});
+
+// ── Auth V2 schemas ───────────────────────────────────────────────────────────
+// Password policy: 8+ chars, at least 2 character classes (letters, digits, symbols)
+function passwordSchema() {
+  return z.string().min(8, '密码至少 8 位').max(50).refine((v) => {
+    let classes = 0;
+    if (/[a-zA-Z]/.test(v)) classes++;
+    if (/[0-9]/.test(v)) classes++;
+    if (/[^a-zA-Z0-9]/.test(v)) classes++;
+    return classes >= 2;
+  }, '密码需包含至少两种字符类型（字母、数字、符号）');
+}
+
+export const EmailRegisterSchema = z.object({
+  email: z.string().email('请输入有效邮箱').max(100),
+  password: passwordSchema(),
+  name: z.string().min(1).max(50),
+  locale: z.string().max(10).optional(),
+});
+
+export const EmailVerifySchema = z.object({
+  email: z.string().email().max(100),
+  code: z.string().length(6),
+  purpose: z.enum(['register', 'login', 'reset_password', 'bind']).default('register'),
+});
+
+export const SendCodeSchema = z.object({
+  channel: z.enum(['email', 'phone']),
+  target: z.string().min(1).max(100),
+  purpose: z.enum(['register', 'login', 'reset_password', 'bind']).default('register'),
+});
+
+export const EmailLoginSchema = z.object({
+  email: z.string().email().max(100),
+  password: z.string().min(1),
+});
+
+export const ResetPasswordSchema = z.object({
+  email: z.string().email().max(100),
+  code: z.string().length(6),
+  new_password: passwordSchema(),
+});
+
+// ── Phone auth schemas (Phase 2) ──────────────────────────────────────────────
+export const PhoneRegisterSchema = z.object({
+  phone: z.string().regex(/^1[3-9]\d{9}$/, '请输入有效的 11 位手机号'),
+  password: passwordSchema(),
+  name: z.string().min(1).max(50),
+  locale: z.string().max(10).optional(),
+});
+
+export const PhoneVerifySchema = z.object({
+  phone: z.string().regex(/^1[3-9]\d{9}$/),
+  code: z.string().length(6),
+  purpose: z.enum(['register', 'login', 'reset_password', 'bind']).default('register'),
+});
+
+export const PhoneLoginSchema = z.object({
+  phone: z.string().regex(/^1[3-9]\d{9}$/),
+  password: z.string().min(1),
+});
+
+export const PhoneResetPasswordSchema = z.object({
+  phone: z.string().regex(/^1[3-9]\d{9}$/),
+  code: z.string().length(6),
+  new_password: passwordSchema(),
 });
 
 export const CreateGlobalShooterSchema = z.object({
@@ -307,6 +375,15 @@ export type UpdateClub = z.infer<typeof UpdateClubSchema>;
 export type CreateUser = z.infer<typeof CreateUserSchema>;
 export type UpdateUser = z.infer<typeof UpdateUserSchema>;
 export type RegisterInput = z.infer<typeof RegisterSchema>;
+export type EmailRegisterInput = z.infer<typeof EmailRegisterSchema>;
+export type EmailVerifyInput = z.infer<typeof EmailVerifySchema>;
+export type SendCodeInput = z.infer<typeof SendCodeSchema>;
+export type EmailLoginInput = z.infer<typeof EmailLoginSchema>;
+export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
+export type PhoneRegisterInput = z.infer<typeof PhoneRegisterSchema>;
+export type PhoneVerifyInput = z.infer<typeof PhoneVerifySchema>;
+export type PhoneLoginInput = z.infer<typeof PhoneLoginSchema>;
+export type PhoneResetPasswordInput = z.infer<typeof PhoneResetPasswordSchema>;
 export type CreateGlobalShooter = z.infer<typeof CreateGlobalShooterSchema>;
 export type UpdateGlobalShooter = z.infer<typeof UpdateGlobalShooterSchema>;
 export type ChangeSquad = z.infer<typeof ChangeSquadSchema>;

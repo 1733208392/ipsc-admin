@@ -861,4 +861,80 @@ if (usersCount === 0) {
     db.prepare(`INSERT INTO users (username, password_hash, role, club_id, name, status, created_at, updated_at)
      VALUES (?, ?, 'club_admin', ?, ?, 'active', datetime('now'), datetime('now'))`).run('clubadmin', bcrypt.hashSync(defaultClubPassword, 10), defaultClub.id, 'Default Club Admin');
 }
+// ── Auth V2: users table extension + new identity/verification tables ─────────
+function ensureAuthV2Schema() {
+    // 1. users table: add new columns (password_hash nullable, email, phone, verified fields, avatar, locale)
+    const userCols = db.prepare(`PRAGMA table_info(users)`).all();
+    const userColNames = new Set(userCols.map((c) => c.name));
+    if (!userColNames.has('email')) {
+        db.exec(`ALTER TABLE users ADD COLUMN email TEXT`);
+    }
+    if (!userColNames.has('phone')) {
+        db.exec(`ALTER TABLE users ADD COLUMN phone TEXT`);
+    }
+    if (!userColNames.has('email_verified_at')) {
+        db.exec(`ALTER TABLE users ADD COLUMN email_verified_at TEXT`);
+    }
+    if (!userColNames.has('phone_verified_at')) {
+        db.exec(`ALTER TABLE users ADD COLUMN phone_verified_at TEXT`);
+    }
+    if (!userColNames.has('avatar_url')) {
+        db.exec(`ALTER TABLE users ADD COLUMN avatar_url TEXT`);
+    }
+    if (!userColNames.has('locale')) {
+        db.exec(`ALTER TABLE users ADD COLUMN locale TEXT NOT NULL DEFAULT 'zh-CN'`);
+    }
+    // Email/phone unique indexes (allow NULLs — SQLite treats NULL as distinct)
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL`);
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone) WHERE phone IS NOT NULL`);
+    // Backfill email/phone for legacy users where username looks like an email or phone
+    db.exec(`UPDATE users SET email = username WHERE email IS NULL AND username LIKE '%@%'`);
+    db.exec(`UPDATE users SET phone = username WHERE phone IS NULL AND username GLOB '[0-9]*' AND length(username) >= 8`);
+    // 2. user_identities table — links multiple OAuth/email/phone providers to a single user
+    if (!tableExists('user_identities')) {
+        db.exec(`
+      CREATE TABLE user_identities (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        provider TEXT NOT NULL CHECK(provider IN ('email','phone','apple','google','wechat')),
+        provider_uid TEXT NOT NULL,
+        provider_email TEXT,
+        provider_name TEXT,
+        raw_profile TEXT,
+        linked_at TEXT NOT NULL DEFAULT (datetime('now')),
+        last_used_at TEXT,
+        UNIQUE(provider, provider_uid)
+      )
+    `);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_user_identities_user ON user_identities(user_id)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_user_identities_lookup ON user_identities(provider, provider_uid)`);
+    }
+    // 3. verification_codes table — email/phone OTP codes
+    if (!tableExists('verification_codes')) {
+        db.exec(`
+      CREATE TABLE verification_codes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        channel TEXT NOT NULL CHECK(channel IN ('email','phone')),
+        target TEXT NOT NULL,
+        code TEXT NOT NULL,
+        purpose TEXT NOT NULL CHECK(purpose IN ('register','login','reset_password','bind')),
+        expires_at TEXT NOT NULL,
+        consumed_at TEXT,
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        ip_address TEXT
+      )
+    `);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_verification_codes_target ON verification_codes(target, purpose)`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_verification_codes_expires ON verification_codes(expires_at)`);
+    }
+    // Cleanup expired verification codes on startup
+    db.exec(`DELETE FROM verification_codes WHERE datetime(expires_at) <= datetime('now')`);
+}
+try {
+    ensureAuthV2Schema();
+}
+catch (err) {
+    console.error('[db] Auth V2 schema migration failed:', err);
+}
 export default db;

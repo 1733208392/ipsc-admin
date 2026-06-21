@@ -8,6 +8,11 @@ interface AuthContextValue {
   isLoggedIn: boolean
   login: (username: string, password: string) => Promise<void>
   register: (payload: { username: string; password: string; name: string; phone?: string }) => Promise<void>
+  loginWithEmail: (email: string, password: string) => Promise<void>
+  registerWithEmail: (payload: { email: string; password: string; name: string; locale?: string }) => Promise<{ verificationToken: string; email: string }>
+  verifyEmail: (payload: { email: string; code: string; verification_token: string }) => Promise<void>
+  sendCode: (payload: { channel: 'email' | 'phone'; target: string; purpose: 'register' | 'login' | 'reset_password' | 'bind' }) => Promise<void>
+  resetPassword: (payload: { email: string; code: string; new_password: string }) => Promise<void>
   logout: () => Promise<void>
   refreshMe: () => Promise<void>
 }
@@ -18,6 +23,11 @@ const AuthContext = createContext<AuthContextValue>({
   isLoggedIn: false,
   login: async () => undefined,
   register: async () => undefined,
+  loginWithEmail: async () => undefined,
+  registerWithEmail: async () => ({ verificationToken: '', email: '' }),
+  verifyEmail: async () => undefined,
+  sendCode: async () => undefined,
+  resetPassword: async () => undefined,
   logout: async () => undefined,
   refreshMe: async () => undefined,
 })
@@ -48,6 +58,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(result.user)
   }
 
+  async function loginWithEmail(email: string, password: string) {
+    const result = await api.post<LoginResult>('/auth/login/email', { email, password })
+    setToken(result.token)
+    setUser(result.user)
+  }
+
+  async function registerWithEmail(payload: { email: string; password: string; name: string; locale?: string }) {
+    const result = await api.post<{ verification_token: string; email: string }>('/auth/register/email', payload)
+    return { verificationToken: result.verification_token, email: result.email }
+  }
+
+  async function verifyEmail(payload: { email: string; code: string; verification_token: string }) {
+    const result = await api.post<LoginResult>('/auth/verify-email', {
+      email: payload.email,
+      code: payload.code,
+      verification_token: payload.verification_token,
+      purpose: 'register',
+    })
+    setToken(result.token)
+    setUser(result.user)
+  }
+
+  async function sendCode(payload: { channel: 'email' | 'phone'; target: string; purpose: 'register' | 'login' | 'reset_password' | 'bind' }) {
+    await api.post('/auth/send-code', payload)
+  }
+
+  async function resetPassword(payload: { email: string; code: string; new_password: string }) {
+    await api.post('/auth/reset-password', payload)
+  }
+
   async function logout() {
     try {
       await api.post('/auth/logout', {})
@@ -73,6 +113,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoggedIn: !!user,
       login,
       register,
+      loginWithEmail,
+      registerWithEmail,
+      verifyEmail,
+      sendCode,
+      resetPassword,
       logout,
       refreshMe,
     }),

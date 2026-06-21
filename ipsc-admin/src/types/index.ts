@@ -33,6 +33,10 @@ export interface UserAccount {
   club_id: number | null
   name: string
   phone: string | null
+  email: string | null
+  email_verified_at: string | null
+  avatar_url: string | null
+  locale: string
   status: 'active' | 'inactive'
   last_login_at?: string | null
   club_name?: string | null

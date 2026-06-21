@@ -32,10 +32,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error((err as { error?: string }).error || `HTTP ${res.status}`)
+    const message = (err as { error?: string; message?: string }).error
+      || (err as { error?: string; message?: string }).message
+      || `HTTP ${res.status}`
+    throw new Error(message)
   }
   const json = await res.json()
-  return (json as { data: T }).data
+
+  // Support both API envelope responses ({ data }) and legacy/raw payload responses.
+  if (json && typeof json === 'object' && 'data' in (json as Record<string, unknown>)) {
+    return (json as { data: T }).data
+  }
+
+  return json as T
 }
 
 export const api = {

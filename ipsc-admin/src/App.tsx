@@ -18,6 +18,9 @@ import { LiveScorecardPage } from '@/pages/LiveScorecardPage'
 import { LeaderboardLivestreamPage } from '@/pages/LeaderboardLivestreamPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
+import { VerifyEmailPage } from '@/pages/VerifyEmailPage'
+import { VerifyPhonePage } from '@/pages/VerifyPhonePage'
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage'
 import { AdminClubsPage } from '@/pages/AdminClubsPage'
 import { AdminUsersPage } from '@/pages/AdminUsersPage'
 import { AdminMatchesPage } from '@/pages/AdminMatchesPage'
@@ -54,6 +57,9 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/verify-phone" element={<VerifyPhonePage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route
               element={
                 <RequireAuth>

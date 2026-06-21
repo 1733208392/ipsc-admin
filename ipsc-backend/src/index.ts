@@ -32,6 +32,7 @@ import drillReplaysRouter, { getDrillReplay, deleteDrillReplay } from './routes/
 import drillsRouter from './routes/drills.js';
 import myDrillsRouter from './routes/my-drills.js';
 import myReplaysRouter from './routes/my-replays.js';
+import adminRouter from './routes/admin.js';
 import { getUploadsDir } from './services/stage-files.js';
 
 const app = express();
@@ -108,6 +109,16 @@ api.delete('/drill-replays/:id', deleteDrillReplay);
 api.use(drillsRouter);
 api.use('/my', myDrillsRouter);
 api.use('/my', myReplaysRouter);
+
+// Admin (superadmin role required)
+api.use('/admin', (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const user = (req as any).user;
+  if (!user || user.role !== 'super_admin') {
+    res.status(403).json({ success: false, error: 'Forbidden: superadmin role required' });
+    return;
+  }
+  next();
+}, adminRouter);
 
 
 app.use('/api/v1', api);

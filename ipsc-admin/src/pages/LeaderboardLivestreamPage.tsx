@@ -242,12 +242,13 @@ export function LeaderboardLivestreamPage() {
           </div>
         ) : (
           <div className="mt-3 sm:mt-4">
-            <div className="ls-ui-font grid grid-cols-[40px_1.2fr_0.8fr_0.8fr_1fr] items-center rounded-t-lg bg-black/35 px-2 py-1.5 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-300 sm:grid-cols-[60px_1.2fr_0.8fr_0.8fr_1fr] sm:px-3 sm:py-2 sm:text-[9px] lg:grid-cols-[100px_1.4fr_1fr_1fr_1fr] lg:px-5 lg:py-3 lg:text-[14px] lg:tracking-[0.08em] xl:grid-cols-[110px_1.4fr_1fr_1fr_1fr] xl:px-6 xl:py-3 xl:text-[16px]">
+            <div className="ls-ui-font grid grid-cols-[40px_1.2fr_0.8fr_0.8fr_0.8fr_0.8fr] items-center rounded-t-lg bg-black/35 px-2 py-1.5 text-[8px] font-bold uppercase tracking-[0.12em] text-zinc-300 sm:grid-cols-[60px_1.2fr_0.8fr_0.8fr_0.8fr_0.8fr] sm:px-3 sm:py-2 sm:text-[9px] lg:grid-cols-[100px_1.4fr_1fr_1fr_1fr_1fr] lg:px-5 lg:py-3 lg:text-[14px] lg:tracking-[0.08em] xl:grid-cols-[110px_1.4fr_1fr_1fr_1fr_1fr] xl:px-6 xl:py-3 xl:text-[16px]">
               <span>Rank</span>
               <span>Name</span>
               <span className="text-right">HF</span>
               <span className="text-right">%</span>
-              <span className="text-right">Stage Points</span>
+              <span className="text-right">得分</span>
+              <span className="text-right">用时</span>
             </div>
 
             <div className="space-y-1 p-1 sm:space-y-1.5 sm:p-1.5 lg:space-y-2.5 lg:p-3">
@@ -257,7 +258,7 @@ export function LeaderboardLivestreamPage() {
                 return (
                   <div
                     key={entry.id}
-                    className="relative flex flex-wrap items-center gap-1 bg-center bg-no-repeat px-2 py-1.5 text-white sm:gap-1.5 sm:px-3 sm:py-2 lg:grid lg:grid-cols-[100px_1.4fr_1fr_1fr_1fr] lg:gap-0 lg:px-5 lg:py-3 xl:grid-cols-[110px_1.4fr_1fr_1fr_1fr] xl:px-6 xl:py-4"
+                    className="relative flex flex-wrap items-center gap-1 bg-center bg-no-repeat px-2 py-1.5 text-white sm:gap-1.5 sm:px-3 sm:py-2 lg:grid lg:grid-cols-[100px_1.4fr_1fr_1fr_1fr_1fr] lg:gap-0 lg:px-5 lg:py-3 xl:grid-cols-[110px_1.4fr_1fr_1fr_1fr_1fr] xl:px-6 xl:py-4"
                     style={{
                       backgroundImage: `url(${rowBackground})`,
                       backgroundSize: '100% 100%',
@@ -273,13 +274,16 @@ export function LeaderboardLivestreamPage() {
                       </div>
                     </div>
                     <div className="ls-number-font relative flex-1 text-right text-base font-black text-zinc-100 sm:text-lg lg:text-[26px] xl:text-[32px]">
-                      {formatNumeric(entry.hit_factor, 2)}
+                      {formatNumeric(entry.hit_factor, 4)}
                     </div>
                     <div className="ls-number-font relative flex-1 text-right text-base font-black text-zinc-100 sm:text-lg lg:text-[26px] xl:text-[32px]">
                       {formatNumeric(entry.percentage, 1)}%
                     </div>
                     <div className="ls-number-font relative flex-1 text-right text-base font-black text-zinc-100 sm:text-lg lg:text-[26px] xl:text-[32px]">
-                      {formatNumeric(entry.stage_points_earned, 2)}
+                      {formatNumeric(entry.total_points, 2)}
+                    </div>
+                    <div className="ls-number-font relative flex-1 text-right text-base font-black text-zinc-300 sm:text-lg lg:text-[26px] xl:text-[32px]">
+                      {formatNumeric(entry.total_time, 2)}
                     </div>
                   </div>
                 )

@@ -252,6 +252,8 @@ export interface LeaderboardEntry {
     hit_factor: number
     rank_in_stage: number
     submission_seq?: number
+    total_time?: number
+    total_points?: number
   }>
   submission_seq?: number
   hit_factor?: number
@@ -260,6 +262,9 @@ export interface LeaderboardEntry {
   stage_points_max?: number
   total_points?: number
   total_time?: number
+  // overall 汇总字段
+  total_time_sum?: number
+  total_points_sum?: number
 }
 
 export interface LeaderboardResponse {

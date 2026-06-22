@@ -67,7 +67,6 @@ function LeaderboardTable({
             <>
               <TableHead className="text-right">HF</TableHead>
               <TableHead className="text-right">%</TableHead>
-              <TableHead className="text-right">Stage Points</TableHead>
               <TableHead className="text-right">原始得分</TableHead>
               <TableHead className="text-right">用时</TableHead>
             </>
@@ -76,8 +75,9 @@ function LeaderboardTable({
               <TableHead>区域</TableHead>
               <TableHead>俱乐部</TableHead>
               <TableHead className="text-center">完成 Stage</TableHead>
-              <TableHead className="text-right font-semibold">总 Stage Points</TableHead>
-              <TableHead className="text-right">平均%</TableHead>
+              <TableHead className="text-right font-semibold">平均%</TableHead>
+              <TableHead className="text-right">总用时</TableHead>
+              <TableHead className="text-right">总得分</TableHead>
             </>
           )}
         </TableRow>
@@ -110,9 +110,8 @@ function LeaderboardTable({
                 </TableCell>
                 {isStageMode ? (
                   <>
-                    <TableCell className="text-right">{Number(e.hit_factor ?? 0).toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-mono">{Number(e.hit_factor ?? 0).toFixed(4)}</TableCell>
                     <TableCell className="text-right">{Number(e.percentage ?? 0).toFixed(1)}%</TableCell>
-                    <TableCell className="text-right font-bold">{Number(e.stage_points_earned ?? 0).toFixed(2)}</TableCell>
                     <TableCell className="text-right">{Number(e.total_points ?? 0).toFixed(2)}</TableCell>
                     <TableCell className="text-right text-muted-foreground">{Number(e.total_time ?? 0).toFixed(2)}</TableCell>
                   </>
@@ -121,14 +120,15 @@ function LeaderboardTable({
                     <TableCell>{e.region ?? '-'}</TableCell>
                     <TableCell>{e.club ?? '-'}</TableCell>
                     <TableCell className="text-center">{e.stages_shot ?? 0}/{totalStages}</TableCell>
-                    <TableCell className="text-right font-bold">{Number(e.total_stage_points ?? 0).toFixed(2)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{Number(e.avg_percentage ?? 0).toFixed(2)}%</TableCell>
+                    <TableCell className="text-right font-semibold">{Number(e.avg_percentage ?? 0).toFixed(2)}%</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{Number(e.total_time ?? 0).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{Number(e.total_points ?? 0).toFixed(2)}</TableCell>
                   </>
                 )}
               </TableRow>
               {!isStageMode && isExpanded && hasDetails ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="bg-muted/40">
+                  <TableCell colSpan={10} className="bg-muted/40">
                     <div className="space-y-1 text-sm">
                       {Object.entries(e.stage_details ?? {})
                         .sort((a, b) => Number(a[0]) - Number(b[0]))
@@ -137,9 +137,10 @@ function LeaderboardTable({
                           return (
                             <div key={`${e.id}-${stageId}`} className="flex flex-wrap gap-3 items-center">
                               <span className="font-medium min-w-36">{stageNameMap.get(Number(stageId)) ?? `Stage ${stageId}`}</span>
-                              <span>HF={detail.hit_factor.toFixed(2)}</span>
+                              <span>HF={detail.hit_factor.toFixed(4)}</span>
                               <span>{detail.percentage.toFixed(1)}%</span>
-                              <span>{detail.stage_points_earned.toFixed(2)} pts</span>
+                              <span className="text-muted-foreground">{detail.total_points?.toFixed(2) ?? '-'} pts</span>
+                              <span className="text-muted-foreground">{detail.total_time?.toFixed(2) ?? '-'}s</span>
                               <span>{medal}</span>
                             </div>
                           )

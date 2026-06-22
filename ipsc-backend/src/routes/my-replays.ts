@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import db from '../db.js';
-import { PersonalDrillReplayUploadSchema, ok, fail } from '../types.js';
+import { DrillReplayUploadSchema, ok, fail } from '../types.js';
 
 const router = Router();
 
@@ -97,7 +97,7 @@ router.post(['/drills/:drillId/drill-records', '/drills/:drillId/replays'], (req
     return;
   }
 
-  const parsed = PersonalDrillReplayUploadSchema.safeParse(req.body);
+  const parsed = DrillReplayUploadSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json(fail(parsed.error.message));
     return;

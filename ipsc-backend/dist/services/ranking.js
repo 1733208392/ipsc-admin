@@ -174,6 +174,8 @@ export function calculateOverallRanking(matchId, divisionId, categoryFilter) {
                     rank_in_stage: index + 1,
                     stage_points_max: stagePointsMax,
                     submission_seq: score.submission_seq,
+                    total_time: score.total_time,
+                    total_points: score.total_points,
                 });
             });
         }
@@ -183,11 +185,15 @@ export function calculateOverallRanking(matchId, divisionId, categoryFilter) {
         let totalStagePoints = 0;
         let totalPercentage = 0;
         let stagesShot = 0;
+        let totalTime = 0;
+        let totalPoints = 0;
         if (stageMap) {
             for (const detail of stageMap.values()) {
                 totalStagePoints += detail.stage_points_earned;
                 totalPercentage += detail.percentage;
                 stagesShot += 1;
+                totalTime += detail.total_time;
+                totalPoints += detail.total_points;
             }
         }
         return {
@@ -195,6 +201,8 @@ export function calculateOverallRanking(matchId, divisionId, categoryFilter) {
             stages_shot: stagesShot,
             total_stage_points: round2(totalStagePoints),
             avg_percentage: stagesShot > 0 ? round2(totalPercentage / stagesShot) : 0,
+            total_time: round2(totalTime),
+            total_points: round2(totalPoints),
             stage_details: stageMap ? Object.fromEntries(stageMap.entries()) : {},
         };
     });

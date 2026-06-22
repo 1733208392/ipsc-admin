@@ -48,7 +48,44 @@ export interface PersonalReplayDetail extends PersonalReplaySummary {
   client_drill_result_id: string | null
   device_id: string | null
   uploaded_by: number | null
-  payload: unknown
+  payload: DrillPayload | unknown
+}
+
+/** 训练记录 payload 中的逐发数据 */
+export interface ShotRecord {
+  type: string
+  device: string
+  target?: string
+  action?: string
+  content: {
+    command: string
+    hit_area: string // AZone | AZone1 | CZone | DZone | APopper | miss
+    hit_position: { x: number; y: number }
+    target_type: string // ipsc | ipsc_mini_double | special_1
+    time_diff: number
+  }
+}
+
+/** 训练记录 payload 顶层结构 */
+export interface DrillPayload {
+  score: number
+  factor: number
+  totalTime: number
+  numShots: number
+  firstShot: number
+  fastest: number
+  drillName: string
+  athleteName: string
+  athleteClub: string
+  hitZones: {
+    A: number
+    C: number
+    D: number
+    M: number
+    N: number
+    PE: number
+  }
+  shotData: ShotRecord[]
 }
 
 export interface TrainingStats {

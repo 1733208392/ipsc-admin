@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import db from '../db.js';
-import { PersonalDrillReplayUploadSchema, ok, fail } from '../types.js';
+import { DrillReplayUploadSchema, ok, fail } from '../types.js';
 const router = Router();
 function positiveInt(value) {
     const parsed = Number(value);
@@ -53,7 +53,7 @@ function serializeReplaySummary(row) {
         created_at: row.created_at,
     };
 }
-router.post('/drills/:drillId/replays', (req, res) => {
+router.post(['/drills/:drillId/drill-records', '/drills/:drillId/replays'], (req, res) => {
     if (!req.user) {
         res.status(401).json(fail('未登录'));
         return;
@@ -68,7 +68,7 @@ router.post('/drills/:drillId/replays', (req, res) => {
         res.status(404).json(fail('Drill template not found'));
         return;
     }
-    const parsed = PersonalDrillReplayUploadSchema.safeParse(req.body);
+    const parsed = DrillReplayUploadSchema.safeParse(req.body);
     if (!parsed.success) {
         res.status(400).json(fail(parsed.error.message));
         return;
@@ -106,7 +106,7 @@ router.post('/drills/:drillId/replays', (req, res) => {
          WHERE r.id = ? AND r.owner_user_id = ?`)
             .get(replayId, req.user.id);
         if (!row) {
-            res.status(500).json(fail('Failed to load saved replay'));
+            res.status(500).json(fail('Failed to load saved drill record'));
             return;
         }
         res.json(ok(serializeReplay(row)));
@@ -115,7 +115,7 @@ router.post('/drills/:drillId/replays', (req, res) => {
         res.status(500).json(fail(String(err)));
     }
 });
-router.get('/drills/:drillId/replays', (req, res) => {
+router.get(['/drills/:drillId/drill-records', '/drills/:drillId/replays'], (req, res) => {
     if (!req.user) {
         res.status(401).json(fail('未登录'));
         return;
@@ -156,7 +156,7 @@ router.get('/drills/:drillId/replays', (req, res) => {
         res.status(500).json(fail(String(err)));
     }
 });
-router.get('/replays/stats', (req, res) => {
+router.get(['/drill-records/stats', '/replays/stats'], (req, res) => {
     if (!req.user) {
         res.status(401).json(fail('未登录'));
         return;
@@ -211,7 +211,7 @@ router.get('/replays/stats', (req, res) => {
         res.status(500).json(fail(String(err)));
     }
 });
-router.get('/replays', (req, res) => {
+router.get(['/drill-records', '/replays'], (req, res) => {
     if (!req.user) {
         res.status(401).json(fail('未登录'));
         return;
@@ -253,14 +253,14 @@ router.get('/replays', (req, res) => {
         res.status(500).json(fail(String(err)));
     }
 });
-router.get('/replays/:id', (req, res) => {
+router.get(['/drill-records/:id', '/replays/:id'], (req, res) => {
     if (!req.user) {
         res.status(401).json(fail('未登录'));
         return;
     }
     const id = positiveInt(req.params['id']);
     if (!id) {
-        res.status(400).json(fail('Invalid replay id'));
+        res.status(400).json(fail('Invalid drill record id'));
         return;
     }
     try {
@@ -271,7 +271,7 @@ router.get('/replays/:id', (req, res) => {
          WHERE r.id = ? AND r.owner_user_id = ?`)
             .get(id, req.user.id);
         if (!row) {
-            res.status(404).json(fail('Drill replay not found'));
+            res.status(404).json(fail('Drill record not found'));
             return;
         }
         res.json(ok(serializeReplay(row)));
@@ -280,20 +280,20 @@ router.get('/replays/:id', (req, res) => {
         res.status(500).json(fail(String(err)));
     }
 });
-router.delete('/replays/:id', (req, res) => {
+router.delete(['/drill-records/:id', '/replays/:id'], (req, res) => {
     if (!req.user) {
         res.status(401).json(fail('未登录'));
         return;
     }
     const id = positiveInt(req.params['id']);
     if (!id) {
-        res.status(400).json(fail('Invalid replay id'));
+        res.status(400).json(fail('Invalid drill record id'));
         return;
     }
     try {
         const info = db.prepare(`DELETE FROM drill_replays WHERE id = ? AND owner_user_id = ?`).run(id, req.user.id);
         if (info.changes === 0) {
-            res.status(404).json(fail('Drill replay not found'));
+            res.status(404).json(fail('Drill record not found'));
             return;
         }
         res.json(ok({ id }));
